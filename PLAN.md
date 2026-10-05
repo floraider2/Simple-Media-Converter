@@ -1,6 +1,6 @@
 # Simple Converter – Projektplan
 
-Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 13 Unit-Tests grün, Lint sauber, noch nicht auf einem Gerät getestet)
+Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 14 Unit-Tests grün, Lint sauber, erster Gerätetest auf Galaxy S24 Ultra / Android 16 bestanden)
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Arbeits-Branch: `media3-v0.1`
 
@@ -83,11 +83,11 @@ Ein Medienkonverter für Android, der **komplett offline** läuft:
 
 | # | Problem | Auswirkung | Lösung (Version) |
 |---|---|---|---|
-| L1 | Noch nie auf einem Gerät gelaufen | unbekannte Laufzeitfehler | Testlauf auf Emulator + echtem Gerät (v0.1.1) |
+| L1 | ✅ Noch nie auf einem Gerät gelaufen | unbekannte Laufzeitfehler | Testlauf auf Emulator + echtem Gerät (v0.1.1) |
 | L2 | ✅ URI-Rechte geteilter Dateien hängen an der Activity | Wird die App geschlossen, kann der Worker die Quelle evtl. nicht mehr lesen | Prüfen; ggf. Quelle vorher in den Cache kopieren oder Worker vor Activity-Ende Daten öffnen lassen (v0.1.1) |
 | L3 | ✅ Keine „Fertig“-Benachrichtigung | Wer die App verlässt, merkt das Ende nicht | Abschluss-Benachrichtigung mit „Teilen/Öffnen“ (v0.1.1) |
 | L4 | ✅ UI verliert laufenden Job nach Prozess-Tod | Fortschrittsbildschirm fehlt nach Neustart | Laufende Arbeit per WorkManager-Tag beim Start wieder aufnehmen (v0.1.1) |
-| L5 | Hochkant-Videos + Skalierung ungetestet | evtl. Balken oder falsche Ausrichtung | Testvideo hochkant 1080×1920 prüfen (v0.1.1) |
+| L5 | ✅ Hochkant-Videos + Skalierung ungetestet (geprüft: 1080×2340 → 720×1560, richtig gedreht) | evtl. Balken oder falsche Ausrichtung | Testvideo hochkant 1080×1920 prüfen (v0.1.1) |
 | L6 | HDR-Videos (HDR10/HLG) | evtl. blasse Farben oder Fehler | Media3 `HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL` setzen (v0.2) |
 | L7 | Texte fest im Kotlin-Code | keine Übersetzung möglich | Nach `strings.xml` verschieben (v0.3) |
 | L8 | Android 8/9: Ergebnis nur im App-Ordner | nicht in der Galerie sichtbar | „Speichern unter …“ per `CreateDocument` anbieten (v0.2) |
@@ -146,12 +146,12 @@ com.simpleconverter.app
 Ziel: v0.1 läuft zuverlässig auf echten Geräten.
 
 - [x] Git-Identität setzen, ersten Commit anlegen (L10)
-- [ ] Emulator-Image installieren (API 35) + AVD anlegen; zusätzlich ein echtes Gerät
-- [ ] Testmatrix aus Abschnitt 7 einmal komplett durchlaufen
+- [x] Echtes Gerät: Galaxy S24 Ultra, Android 16 (Emulator für Android 8–13 folgt)
+- [ ] Testmatrix aus Abschnitt 7 einmal komplett durchlaufen (Stand: siehe 7.1)
 - [x] Abschluss-Benachrichtigung mit „Öffnen“ / „Teilen“ (L3)
 - [x] Laufende Umwandlung nach App-Neustart wiederfinden (L4)
 - [x] URI-Rechte geteilter Dateien absichern (L2)
-- [ ] Hochkant-Video-Skalierung prüfen/korrigieren (L5)
+- [x] Hochkant-Video-Skalierung prüfen/korrigieren (L5)
 - [x] Verständliche Fehlermeldungen statt technischer Exception-Texte
       (z. B. „Dieses Videoformat kann dein Gerät nicht lesen“)
 - [x] Unit-Tests: Bitrate-Rechnung, `ConversionSettings` ↔ `Data`, Vorgaben, Dateinamen (13 Tests)
@@ -252,6 +252,29 @@ Ab v0.2 zusätzlich: Mehrfachauswahl → Einstellungen gelten für alle → Fort
 | Unit | ViewModel-Zustände (Setup → Working → Done/Failed/Cancelled) | JUnit + Turbine + WorkManager-Testing |
 | Instrumentiert | Je Konverter eine echte Umwandlung mit kleinen Testdateien in `androidTest/assets` | AndroidX Test auf Emulator |
 | CI | `assembleDebug`, `lintDebug`, Unit-Tests bei jedem Push | GitHub Actions / Forgejo Actions |
+
+### 7.1 Gerätetest 05.10.2026 – Galaxy S24 Ultra (SM-S928B), Android 16
+
+Gesteuert per adb mit selbst erzeugten Testdateien (Ton-WAV, Bildschirmaufnahme, Screenshot).
+
+| # | Test | Ergebnis |
+|---|---|---|
+| 1 | Video hochkant → MP4 „Für WhatsApp“ | ✅ 720×1560, richtig gedreht |
+| 2 | Video → MP4 „Max. Qualität“ | ✅ |
+| 3 | WAV → M4A Standard / Klein | ✅ 3,4 MB → 474 KB / 239 KB |
+| 4 | WAV → WAV | ✅ |
+| 5 | PNG → JPG, WebP „Kleinste Datei“, PNG verkleinert | ✅ |
+| 6 | 10 min WAV (110 MB) → M4A im Hintergrund | ✅ ca. 80 s, Fortschritt in der Benachrichtigung |
+| 7 | „Fertig“-Benachrichtigung, verschwindet beim Öffnen der App | ✅ (nach Fix) |
+| 8 | Abbrechen in der App | ✅ „Umwandlung abgebrochen.“, zurück zu den Einstellungen |
+| 9 | „Öffnen mit“ (ACTION_VIEW) | ✅ |
+| 10 | Teilen aus Galerie/WhatsApp (ACTION_SEND) | ⏳ manuell durch Nutzer – per adb nicht realistisch testbar |
+| 11 | Video **mit** Ton | ⏳ fehlt noch (Bildschirmaufnahmen haben keinen Ton) |
+
+**Gefunden und behoben**
+- Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.
+- Videos ohne Tonspur boten „Nur Ton“ an und scheiterten mit technischer Meldung → Tonspur wird per `MediaExtractor` erkannt (Samsung liefert `METADATA_KEY_HAS_AUDIO` nicht), Ton-Optionen werden ausgeblendet.
+- „Fertig“-Benachrichtigung wurde sofort wieder entfernt → wird erst gelöscht, wenn die App sichtbar ist.
 
 ### Manuelle Testmatrix
 

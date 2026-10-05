@@ -253,10 +253,17 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         FileHeader(s.file)
+        if (s.file.kind == MediaKind.VIDEO && !s.file.hasAudio) {
+            Text(
+                "Dieses Video hat keine Tonspur.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         Section("Zielformat") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutputFormat.targetsFor(s.file.kind).forEach { format ->
+                s.file.targets().forEach { format ->
                     FilterChip(
                         selected = format == s.format,
                         onClick = { vm.selectFormat(format) },
@@ -366,11 +373,13 @@ private fun AdvancedOptions(
                         settings.videoBitrate,
                     ) { v -> update { it.copy(videoBitrate = v) } }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Ton entfernen", modifier = Modifier.weight(1f))
-                    Switch(checked = settings.removeAudio, onCheckedChange = { c -> update { it.copy(removeAudio = c) } })
+                if (file.hasAudio) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Ton entfernen", modifier = Modifier.weight(1f))
+                        Switch(checked = settings.removeAudio, onCheckedChange = { c -> update { it.copy(removeAudio = c) } })
+                    }
+                    if (!settings.removeAudio) AudioBitrateChips(settings, update)
                 }
-                if (!settings.removeAudio) AudioBitrateChips(settings, update)
             }
             OutputFormat.M4A -> AudioBitrateChips(settings, update)
             OutputFormat.JPG, OutputFormat.WEBP, OutputFormat.PNG -> {
@@ -483,6 +492,15 @@ private fun DoneScreen(s: Screen.Done, onAnother: () -> Unit, modifier: Modifier
         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(72.dp))
         Text(s.outputName, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
         Text("${formatSize(s.file.size)} → ${formatSize(s.outputSize)}", style = MaterialTheme.typography.titleMedium)
+        if (s.outputSize > s.file.size) {
+            Text(
+                "Die neue Datei ist größer als das Original – das Original war schon stark komprimiert. " +
+                    "Für eine kleinere Datei probiere „Kleinste Datei“ oder ein anderes Format.",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { shareOutput(context, s.outputUri, s.mimeType) }) {
                 Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))

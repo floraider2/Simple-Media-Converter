@@ -36,6 +36,14 @@ class BitrateTest {
         assertEquals(Bitrate.MAX_VIDEO, video)
     }
 
+    @Test
+    fun `Bitrate wird auf die des Originals begrenzt`() {
+        assertEquals(400_000, Bitrate.capToSource(2_000_000, 400_000))
+        assertEquals(2_000_000, Bitrate.capToSource(2_000_000, 8_000_000))
+        assertEquals(2_000_000, Bitrate.capToSource(2_000_000, null))
+        assertEquals(Bitrate.MIN_VIDEO, Bitrate.capToSource(2_000_000, 50_000))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun `Dauer null ist ungültig`() {
         Bitrate.videoForTargetSize(1024, 0, 128_000, withAudio = true)

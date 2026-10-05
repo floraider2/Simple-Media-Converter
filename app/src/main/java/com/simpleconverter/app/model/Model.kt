@@ -30,7 +30,13 @@ data class InputFile(
     val mimeType: String?,
     val kind: MediaKind,
     val durationMs: Long?,
-)
+    /** false bei Videos ohne Tonspur (z. B. Bildschirmaufnahmen). */
+    val hasAudio: Boolean = true,
+) {
+    /** Zielformate, die für diese Datei Sinn ergeben. */
+    fun targets(): List<OutputFormat> =
+        OutputFormat.targetsFor(kind).filter { hasAudio || it.kind != MediaKind.AUDIO }
+}
 
 /** Alle Stellschrauben einer Umwandlung. Die Vorgaben ([Preset]) befüllen sie nur. */
 data class ConversionSettings(
@@ -152,5 +158,11 @@ object Bitrate {
         val audioBits = if (withAudio) audioBitrate * seconds else 0.0
         val videoBitrate = ((totalBits - audioBits) / seconds).toLong()
         return videoBitrate.coerceIn(MIN_VIDEO.toLong(), MAX_VIDEO.toLong()).toInt()
+    }
+
+    /** Begrenzt die gewünschte Bitrate auf die des Originals (falls bekannt). */
+    fun capToSource(requested: Int, sourceBitrate: Int?): Int {
+        if (sourceBitrate == null || sourceBitrate <= 0) return requested
+        return minOf(requested, maxOf(sourceBitrate, MIN_VIDEO))
     }
 }

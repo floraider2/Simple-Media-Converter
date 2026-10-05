@@ -102,7 +102,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
                 _message.value = "Diese Datei ist kein Video, Audio oder Bild."
                 return@launch
             }
-            val format = OutputFormat.targetsFor(file.kind).first()
+            val format = file.targets().first()
             _screen.value = setupFor(file, format)
         }
     }
@@ -154,12 +154,19 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             is Screen.Done -> s.file
             else -> return
         }
-        _screen.value = setupFor(file, OutputFormat.targetsFor(file.kind).first())
+        _screen.value = setupFor(file, file.targets().first())
     }
 
     fun clearRecents() {
         RecentStore.clear(getApplication())
         refreshRecents()
+    }
+
+    /** Die App ist wieder sichtbar: Ergebnis steht auf dem Bildschirm, die Benachrichtigung ist überflüssig. */
+    fun onAppVisible() {
+        if (_screen.value is Screen.Done || _screen.value is Screen.Failed) {
+            Notifications.cancelResult(getApplication())
+        }
     }
 
     fun consumeMessage() {
@@ -177,10 +184,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
                     observeJob?.cancel()
                     return@collect
                 }
-                if (info.state.isFinished) {
-                    ActiveJobStore.clear(getApplication())
-                    Notifications.cancelResult(getApplication())
-                }
+                if (info.state.isFinished) ActiveJobStore.clear(getApplication())
                 when (info.state) {
                     WorkInfo.State.SUCCEEDED -> {
                         val out = info.outputData

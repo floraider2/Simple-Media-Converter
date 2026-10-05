@@ -50,14 +50,17 @@ object VideoConverter {
         val audioOnly = settings.format == OutputFormat.M4A
         val removeAudio = !audioOnly && settings.removeAudio
 
-        val effects = if (audioOnly) Effects.EMPTY else videoEffects(context, input, settings.videoShortSide)
+        val probe = probe(context, input)
+        val effects = if (audioOnly) Effects.EMPTY else videoEffects(probe, settings.videoShortSide)
         val edited = EditedMediaItem.Builder(MediaItem.fromUri(input))
             .setRemoveVideo(audioOnly)
             .setRemoveAudio(removeAudio)
             .setEffects(effects)
             .build()
 
-        val videoBitrate = targetVideoBitrate(settings, durationMs, removeAudio) ?: settings.videoBitrate
+        // Nie mehr Bitrate als das Original – sonst wird die Datei beim „Verkleinern“ größer.
+        val videoBitrate = (targetVideoBitrate(settings, durationMs, removeAudio) ?: settings.videoBitrate)
+            ?.let { Bitrate.capToSource(it, probe?.bitrate) }
         val encoderFactory = DefaultEncoderFactory.Builder(context.applicationContext)
             .setEnableFallback(true)
             .setRequestedAudioEncoderSettings(
@@ -124,29 +127,35 @@ object VideoConverter {
         return Bitrate.videoForTargetSize(target, durationMs, settings.audioBitrate, withAudio = !removeAudio)
     }
 
-    private fun videoEffects(context: Context, input: Uri, shortSide: Int?): Effects {
-        if (shortSide == null) return Effects.EMPTY
-        val (width, height) = displaySize(context, input) ?: return Effects.EMPTY
-        val currentShort = min(width, height)
+    private class Probe(val width: Int, val height: Int, val bitrate: Int?)
+
+    private fun videoEffects(probe: Probe?, shortSide: Int?): Effects {
+        if (shortSide == null || probe == null) return Effects.EMPTY
+        val currentShort = min(probe.width, probe.height)
         if (currentShort <= shortSide) return Effects.EMPTY
         val scale = shortSide.toDouble() / currentShort
-        val outWidth = even(width * scale)
-        val outHeight = even(height * scale)
+        val outWidth = even(probe.width * scale)
+        val outHeight = even(probe.height * scale)
         return Effects(
             emptyList(),
             listOf(Presentation.createForWidthAndHeight(outWidth, outHeight, Presentation.LAYOUT_SCALE_TO_FIT)),
         )
     }
 
-    /** Breite und Höhe so, wie das Video angezeigt wird (Drehung berücksichtigt). */
-    private fun displaySize(context: Context, input: Uri): Pair<Int, Int>? {
+    /** Größe so, wie das Video angezeigt wird (Drehung berücksichtigt), und Gesamt-Bitrate. */
+    private fun probe(context: Context, input: Uri): Probe? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, input)
             val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
             val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
             val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-            if (w == null || h == null) null else if (rotation % 180 != 0) h to w else w to h
+            val bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()
+            when {
+                w == null || h == null -> null
+                rotation % 180 != 0 -> Probe(h, w, bitrate)
+                else -> Probe(w, h, bitrate)
+            }
         } catch (e: Exception) {
             null
         } finally {

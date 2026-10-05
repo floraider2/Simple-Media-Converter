@@ -34,6 +34,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        vm.onAppVisible()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         vm.handleIntent(intent)

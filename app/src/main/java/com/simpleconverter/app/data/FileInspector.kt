@@ -1,6 +1,8 @@
 package com.simpleconverter.app.data
 
 import android.content.Context
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -41,15 +43,39 @@ object FileInspector {
         if (size < 0) {
             size = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } }.getOrNull() ?: 0L
         }
-        val duration = if (kind == MediaKind.IMAGE) null else readDuration(context, uri)
-        return InputFile(uri, displayName, size, mime, kind, duration)
+        val meta = if (kind == MediaKind.IMAGE) null else readMeta(context, uri)
+        return InputFile(
+            uri, displayName, size, mime, kind,
+            durationMs = meta?.first,
+            hasAudio = kind == MediaKind.AUDIO || (meta?.second ?: true),
+        )
     }
 
-    private fun readDuration(context: Context, uri: Uri): Long? {
+    /**
+     * Zählt die Spuren selbst – METADATA_KEY_HAS_AUDIO ist nicht auf allen Geräten
+     * zuverlässig (Samsung liefert bei Bildschirmaufnahmen null).
+     */
+    private fun hasAudioTrack(context: Context, uri: Uri): Boolean? {
+        val extractor = MediaExtractor()
+        return try {
+            extractor.setDataSource(context, uri, null)
+            (0 until extractor.trackCount).any {
+                extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
+            }
+        } catch (e: Exception) {
+            null
+        } finally {
+            extractor.release()
+        }
+    }
+
+    /** Dauer und ob eine Tonspur vorhanden ist. */
+    private fun readMeta(context: Context, uri: Uri): Pair<Long?, Boolean?>? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, uri)
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            duration to hasAudioTrack(context, uri)
         } catch (e: Exception) {
             null
         } finally {

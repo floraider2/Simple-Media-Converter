@@ -25,6 +25,7 @@ object ActiveJobStore {
             .putString("mime", job.file.mimeType)
             .putString("kind", job.file.kind.name)
             .putLong("duration", job.file.durationMs ?: 0L)
+            .putBoolean("hasAudio", job.file.hasAudio)
             .putString("format", job.format.name)
             .apply()
     }
@@ -41,6 +42,7 @@ object ActiveJobStore {
                 mimeType = p.getString("mime", null),
                 kind = MediaKind.valueOf(p.getString("kind", null)!!),
                 durationMs = p.getLong("duration", 0L).takeIf { it > 0 },
+                hasAudio = p.getBoolean("hasAudio", true),
             ),
             format = OutputFormat.valueOf(p.getString("format", null)!!),
         )
