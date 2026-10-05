@@ -268,7 +268,7 @@ Gesteuert per adb mit selbst erzeugten Testdateien (Ton-WAV, Bildschirmaufnahme,
 | 7 | „Fertig“-Benachrichtigung, verschwindet beim Öffnen der App | ✅ (nach Fix) |
 | 8 | Abbrechen in der App | ✅ „Umwandlung abgebrochen.“, zurück zu den Einstellungen |
 | 9 | „Öffnen mit“ (ACTION_VIEW) | ✅ |
-| 10 | Teilen aus Galerie/WhatsApp (ACTION_SEND) | ⏳ manuell durch Nutzer – per adb nicht realistisch testbar |
+| 10 | Teilen aus Galerie/WhatsApp (ACTION_SEND) | ✅ manuell: PNG aus der Galerie geteilt → JPG, Cache-Kopie danach entfernt |
 | 11 | Video **mit** Ton | ⏳ fehlt noch (Bildschirmaufnahmen haben keinen Ton) |
 
 **Gefunden und behoben**
