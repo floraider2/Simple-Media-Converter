@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -30,7 +29,7 @@ object WavConverter {
                 extractor.setDataSource(context, input, null)
                 val track = (0 until extractor.trackCount).firstOrNull {
                     extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-                } ?: throw IOException("Die Datei enthält keine Tonspur.")
+                } ?: throw ConversionException("Die Datei enthält keine Tonspur.")
                 extractor.selectTrack(track)
                 val inputFormat = extractor.getTrackFormat(track)
                 val durationUs = if (inputFormat.containsKey(MediaFormat.KEY_DURATION)) {

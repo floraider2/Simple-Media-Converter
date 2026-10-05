@@ -11,7 +11,6 @@ import androidx.core.content.FileProvider
 import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
 import java.io.File
-import java.io.IOException
 
 /** Legt das Ergebnis dort ab, wo man es erwartet: Filme, Musik oder Bilder → „SimpleConverter“. */
 object OutputStore {
@@ -38,10 +37,10 @@ object OutputStore {
             put(MediaStore.MediaColumns.RELATIVE_PATH, "$dir/$FOLDER")
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        val uri = resolver.insert(collection, values) ?: throw IOException("Speichern fehlgeschlagen.")
+        val uri = resolver.insert(collection, values) ?: throw ConversionException("Speichern fehlgeschlagen.")
         try {
             resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
-                ?: throw IOException("Speichern fehlgeschlagen.")
+                ?: throw ConversionException("Speichern fehlgeschlagen.")
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
         } catch (e: Exception) {
             resolver.delete(uri, null, null)

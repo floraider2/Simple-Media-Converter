@@ -130,3 +130,27 @@ data class RecentItem(
     val outputSize: Long,
     val timestamp: Long,
 )
+
+/** Dateiname des Ergebnisses: gleicher Name, neue Endung. */
+fun outputFileName(inputName: String, format: OutputFormat): String {
+    val base = inputName.substringBeforeLast('.', inputName).trim().trimStart('.').ifBlank { "umgewandelt" }
+    return "$base.${format.extension}"
+}
+
+object Bitrate {
+    const val MIN_VIDEO = 150_000
+    const val MAX_VIDEO = 50_000_000
+
+    /**
+     * Video-Bitrate, damit die ganze Datei unter [targetBytes] bleibt.
+     * 5 % Puffer für den Container, die Tonspur wird abgezogen.
+     */
+    fun videoForTargetSize(targetBytes: Long, durationMs: Long, audioBitrate: Int, withAudio: Boolean): Int {
+        require(durationMs > 0) { "Dauer muss größer als 0 sein" }
+        val seconds = durationMs / 1000.0
+        val totalBits = targetBytes * 8 * 0.95
+        val audioBits = if (withAudio) audioBitrate * seconds else 0.0
+        val videoBitrate = ((totalBits - audioBits) / seconds).toLong()
+        return videoBitrate.coerceIn(MIN_VIDEO.toLong(), MAX_VIDEO.toLong()).toInt()
+    }
+}

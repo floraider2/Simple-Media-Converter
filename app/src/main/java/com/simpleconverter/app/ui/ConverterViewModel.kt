@@ -15,7 +15,9 @@ import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.OutputFormat
 import com.simpleconverter.app.model.Presets
 import com.simpleconverter.app.model.RecentItem
+import com.simpleconverter.app.work.ActiveJobStore
 import com.simpleconverter.app.work.ConversionWorker
+import com.simpleconverter.app.work.Notifications
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +36,14 @@ sealed interface Screen {
         val presetId: String?,
         val settings: ConversionSettings,
     ) : Screen
-    data class Working(val file: InputFile, val format: OutputFormat, val progress: Int, val workId: UUID) : Screen
+    data class Working(
+        val file: InputFile,
+        val format: OutputFormat,
+        val progress: Int,
+        val workId: UUID,
+        /** true, solange eine geteilte Datei erst in den Cache kopiert wird. */
+        val preparing: Boolean = false,
+    ) : Screen
     data class Done(
         val file: InputFile,
         val outputUri: Uri,
@@ -62,6 +71,14 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refreshRecents()
+        restoreActiveJob()
+    }
+
+    /** Läuft noch eine Umwandlung aus einer früheren Sitzung? Dann dort weitermachen. */
+    private fun restoreActiveJob() {
+        val job = ActiveJobStore.load(getApplication()) ?: return
+        _screen.value = Screen.Working(job.file, job.format, 0, job.workId)
+        observe(job.workId, job.file, job.format)
     }
 
     /** Eingehende Teilen-/Öffnen-Intents. */
@@ -115,6 +132,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             .setInputData(ConversionWorker.inputData(setup.file, setup.settings))
             .build()
         workManager.enqueue(request)
+        ActiveJobStore.save(getApplication(), ActiveJobStore.ActiveJob(request.id, setup.file, setup.format))
         _screen.value = Screen.Working(setup.file, setup.format, 0, request.id)
         observe(request.id, setup.file, setup.format)
     }
@@ -152,7 +170,17 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
             workManager.getWorkInfoByIdFlow(id).collect { info ->
-                if (info == null) return@collect
+                if (info == null) {
+                    // Job existiert nicht mehr (z. B. von WorkManager aufgeräumt).
+                    ActiveJobStore.clear(getApplication())
+                    _screen.value = Screen.Home
+                    observeJob?.cancel()
+                    return@collect
+                }
+                if (info.state.isFinished) {
+                    ActiveJobStore.clear(getApplication())
+                    Notifications.cancelResult(getApplication())
+                }
                 when (info.state) {
                     WorkInfo.State.SUCCEEDED -> {
                         val out = info.outputData
@@ -178,7 +206,8 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     else -> {
                         val progress = info.progress.getInt(ConversionWorker.KEY_PROGRESS, 0)
-                        _screen.value = Screen.Working(file, format, progress, id)
+                        val preparing = info.progress.getString(ConversionWorker.KEY_PHASE) == ConversionWorker.PHASE_COPY
+                        _screen.value = Screen.Working(file, format, progress, id, preparing)
                     }
                 }
             }

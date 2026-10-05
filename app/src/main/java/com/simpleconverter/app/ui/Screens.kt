@@ -453,6 +453,9 @@ private fun WorkingScreen(s: Screen.Working, onCancel: () -> Unit, modifier: Mod
     ) {
         Text(emojiFor(s.file.kind), style = MaterialTheme.typography.displayMedium)
         Text("${s.file.name} → ${s.format.label}", textAlign = TextAlign.Center)
+        if (s.preparing) {
+            Text("Datei wird vorbereitet …", style = MaterialTheme.typography.bodyMedium)
+        }
         if (s.progress > 0) {
             LinearProgressIndicator(progress = { s.progress / 100f }, modifier = Modifier.fillMaxWidth())
             Text("${s.progress} %", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

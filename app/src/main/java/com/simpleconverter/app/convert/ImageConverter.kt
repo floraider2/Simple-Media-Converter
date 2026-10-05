@@ -15,7 +15,6 @@ import com.simpleconverter.app.model.OutputFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.IOException
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -36,7 +35,7 @@ object ImageConverter {
             try {
                 output.outputStream().use { stream ->
                     val ok = bitmap.compress(compressFormat(settings.format), settings.imageQuality, stream)
-                    if (!ok) throw IOException("Bild konnte nicht gespeichert werden.")
+                    if (!ok) throw ConversionException("Bild konnte nicht gespeichert werden.")
                 }
             } finally {
                 bitmap.recycle()
@@ -70,7 +69,7 @@ object ImageConverter {
         }
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         var bitmap = resolver.openInputStream(input)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: throw IOException("Bildformat wird auf diesem Gerät nicht unterstützt.")
+            ?: throw ConversionException("Bildformat wird auf diesem Gerät nicht unterstützt.")
 
         val rotation = runCatching {
             resolver.openInputStream(input)?.use { ExifInterface(it).rotationDegrees } ?: 0

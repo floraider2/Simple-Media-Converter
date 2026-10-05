@@ -1,6 +1,8 @@
 # Simple Converter – Projektplan
 
-Stand: 05.10.2026 · Version im Repo: **v0.1.0** (baut, Lint sauber, noch nicht auf einem Gerät getestet)
+Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 13 Unit-Tests grün, Lint sauber, noch nicht auf einem Gerät getestet)
+
+Repo: https://github.com/floraider2/Simple-Media-Converter · Arbeits-Branch: `media3-v0.1`
 
 ---
 
@@ -82,15 +84,15 @@ Ein Medienkonverter für Android, der **komplett offline** läuft:
 | # | Problem | Auswirkung | Lösung (Version) |
 |---|---|---|---|
 | L1 | Noch nie auf einem Gerät gelaufen | unbekannte Laufzeitfehler | Testlauf auf Emulator + echtem Gerät (v0.1.1) |
-| L2 | URI-Rechte geteilter Dateien hängen an der Activity | Wird die App geschlossen, kann der Worker die Quelle evtl. nicht mehr lesen | Prüfen; ggf. Quelle vorher in den Cache kopieren oder Worker vor Activity-Ende Daten öffnen lassen (v0.1.1) |
-| L3 | Keine „Fertig“-Benachrichtigung | Wer die App verlässt, merkt das Ende nicht | Abschluss-Benachrichtigung mit „Teilen/Öffnen“ (v0.1.1) |
-| L4 | UI verliert laufenden Job nach Prozess-Tod | Fortschrittsbildschirm fehlt nach Neustart | Laufende Arbeit per WorkManager-Tag beim Start wieder aufnehmen (v0.1.1) |
+| L2 | ✅ URI-Rechte geteilter Dateien hängen an der Activity | Wird die App geschlossen, kann der Worker die Quelle evtl. nicht mehr lesen | Prüfen; ggf. Quelle vorher in den Cache kopieren oder Worker vor Activity-Ende Daten öffnen lassen (v0.1.1) |
+| L3 | ✅ Keine „Fertig“-Benachrichtigung | Wer die App verlässt, merkt das Ende nicht | Abschluss-Benachrichtigung mit „Teilen/Öffnen“ (v0.1.1) |
+| L4 | ✅ UI verliert laufenden Job nach Prozess-Tod | Fortschrittsbildschirm fehlt nach Neustart | Laufende Arbeit per WorkManager-Tag beim Start wieder aufnehmen (v0.1.1) |
 | L5 | Hochkant-Videos + Skalierung ungetestet | evtl. Balken oder falsche Ausrichtung | Testvideo hochkant 1080×1920 prüfen (v0.1.1) |
 | L6 | HDR-Videos (HDR10/HLG) | evtl. blasse Farben oder Fehler | Media3 `HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL` setzen (v0.2) |
 | L7 | Texte fest im Kotlin-Code | keine Übersetzung möglich | Nach `strings.xml` verschieben (v0.3) |
 | L8 | Android 8/9: Ergebnis nur im App-Ordner | nicht in der Galerie sichtbar | „Speichern unter …“ per `CreateDocument` anbieten (v0.2) |
 | L9 | MP3/FLAC/OGG/WebM/MKV als **Ausgabe** fehlen | Android hat dafür keine Encoder | FFmpeg (v0.2) |
-| L10 | Git-Commit fehlgeschlagen | Kein erster Commit | Git-Name/E-Mail setzen, dann committen (sofort) |
+| L10 | ~~Git-Commit fehlgeschlagen~~ | – | erledigt |
 
 ---
 
@@ -143,16 +145,17 @@ com.simpleconverter.app
 
 Ziel: v0.1 läuft zuverlässig auf echten Geräten.
 
-- [ ] Git-Identität setzen, ersten Commit anlegen (L10)
+- [x] Git-Identität setzen, ersten Commit anlegen (L10)
 - [ ] Emulator-Image installieren (API 35) + AVD anlegen; zusätzlich ein echtes Gerät
 - [ ] Testmatrix aus Abschnitt 7 einmal komplett durchlaufen
-- [ ] Abschluss-Benachrichtigung mit „Öffnen“ / „Teilen“ (L3)
-- [ ] Laufende Umwandlung nach App-Neustart wiederfinden (L4)
-- [ ] URI-Rechte geteilter Dateien absichern (L2)
+- [x] Abschluss-Benachrichtigung mit „Öffnen“ / „Teilen“ (L3)
+- [x] Laufende Umwandlung nach App-Neustart wiederfinden (L4)
+- [x] URI-Rechte geteilter Dateien absichern (L2)
 - [ ] Hochkant-Video-Skalierung prüfen/korrigieren (L5)
-- [ ] Verständliche Fehlermeldungen statt technischer Exception-Texte
+- [x] Verständliche Fehlermeldungen statt technischer Exception-Texte
       (z. B. „Dieses Videoformat kann dein Gerät nicht lesen“)
-- [ ] Unit-Tests: Bitrate-Rechnung, `ConversionSettings` ↔ `Data`, Vorgaben
+- [x] Unit-Tests: Bitrate-Rechnung, `ConversionSettings` ↔ `Data`, Vorgaben, Dateinamen (13 Tests)
+- [x] GitHub Actions: Build, Unit-Tests und Lint bei jedem Push, APK als Artefakt
 
 ### v0.2 – Stapel, mehr Formate (3–4 Wochen)
 
@@ -305,8 +308,8 @@ Ab v0.2 zusätzlich: Mehrfachauswahl → Einstellungen gelten für alle → Fort
 
 ## 10. Offene Fragen
 
-1. **Git-Identität**: Welcher Name und welche E-Mail sollen in den Commits stehen?
-2. **Remote**: GitHub oder Codeberg? Öffentlich ab sofort oder erst zu v1.0?
+1. ~~Git-Identität~~ → `floraider2` mit der anonymen GitHub-Adresse (noreply)
+2. ~~Remote~~ → GitHub `floraider2/Simple-Media-Converter`. Der ältere Branch `claude/friendly-einstein-c1yujb` (FFmpeg-Variante) wird nicht weiterverfolgt.
 3. **Paketname**: `com.simpleconverter.app` ist ein Platzhalter – eigene Domain/Name gewünscht? (Muss vor dem ersten Store-Release feststehen, danach nicht mehr änderbar.)
 4. **App-Lizenz**: GPL-3.0 oder Apache-2.0?
 5. **Sprache**: Englisch ab v0.3 genug, oder weitere Sprachen?
@@ -316,7 +319,7 @@ Ab v0.2 zusätzlich: Mehrfachauswahl → Einstellungen gelten für alle → Fort
 
 ## 11. Nächste Schritte (konkret)
 
-1. Git-Identität setzen und ersten Commit machen
+1. ~~Git-Identität setzen und ersten Commit machen~~
 2. Android-Emulator-Image (API 35) installieren, AVD anlegen, App starten
 3. Testmatrix-Punkte 1–9 durchgehen, Fehler beheben → **v0.1.1**
 4. Stapelverarbeitung umsetzen (ohne FFmpeg möglich)

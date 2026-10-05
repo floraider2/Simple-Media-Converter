@@ -20,6 +20,7 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
+import com.simpleconverter.app.model.Bitrate
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.OutputFormat
 import kotlinx.coroutines.Dispatchers
@@ -37,8 +38,6 @@ import kotlin.math.roundToInt
  */
 @OptIn(UnstableApi::class)
 object VideoConverter {
-
-    private const val MIN_VIDEO_BITRATE = 150_000
 
     suspend fun convert(
         context: Context,
@@ -122,12 +121,7 @@ object VideoConverter {
     private fun targetVideoBitrate(settings: ConversionSettings, durationMs: Long?, removeAudio: Boolean): Int? {
         val target = settings.targetSizeBytes ?: return null
         if (durationMs == null || durationMs <= 0) return null
-        val seconds = durationMs / 1000.0
-        // 5 % Puffer für Container-Overhead.
-        val totalBits = target * 8 * 0.95
-        val audioBits = if (removeAudio) 0.0 else settings.audioBitrate * seconds
-        val videoBitrate = ((totalBits - audioBits) / seconds).toLong()
-        return videoBitrate.coerceIn(MIN_VIDEO_BITRATE.toLong(), 50_000_000L).toInt()
+        return Bitrate.videoForTargetSize(target, durationMs, settings.audioBitrate, withAudio = !removeAudio)
     }
 
     private fun videoEffects(context: Context, input: Uri, shortSide: Int?): Effects {
