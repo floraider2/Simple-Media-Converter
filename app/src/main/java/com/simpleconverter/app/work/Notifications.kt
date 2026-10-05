@@ -72,6 +72,21 @@ object Notifications {
         )
     }
 
+    fun batchDone(context: Context, ok: Int, total: Int, detail: String) {
+        val title = if (ok == total) "$total Dateien fertig" else "$ok von $total Dateien fertig"
+        val text = if (ok == total) detail else "${total - ok} fehlgeschlagen · $detail"
+        post(
+            context,
+            NotificationCompat.Builder(context, CHANNEL_RESULT)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setAutoCancel(true)
+                .setContentIntent(openApp(context))
+                .build(),
+        )
+    }
+
     fun failed(context: Context, name: String, message: String) {
         post(
             context,

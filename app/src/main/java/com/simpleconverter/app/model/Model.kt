@@ -15,11 +15,16 @@ enum class OutputFormat(val label: String, val extension: String, val mimeType: 
     WEBP("WebP", "webp", "image/webp", MediaKind.IMAGE);
 
     companion object {
-        fun targetsFor(kind: MediaKind): List<OutputFormat> = when (kind) {
+        /** Zielformate für einen Medientyp; ohne Tonspur gibt es keine Audio-Ziele. */
+        fun targetsFor(kind: MediaKind, hasAudio: Boolean = true): List<OutputFormat> = when (kind) {
             MediaKind.VIDEO -> listOf(MP4, M4A, WAV)
             MediaKind.AUDIO -> listOf(M4A, WAV)
             MediaKind.IMAGE -> listOf(JPG, PNG, WEBP)
-        }
+        }.filter { hasAudio || it.kind != MediaKind.AUDIO }
+
+        /** Formate, die in allen Listen vorkommen (Reihenfolge der ersten Liste). */
+        fun intersect(lists: List<List<OutputFormat>>): List<OutputFormat> =
+            lists.reduceOrNull { acc, t -> acc.filter { it in t } } ?: emptyList()
     }
 }
 
@@ -34,8 +39,7 @@ data class InputFile(
     val hasAudio: Boolean = true,
 ) {
     /** Zielformate, die für diese Datei Sinn ergeben. */
-    fun targets(): List<OutputFormat> =
-        OutputFormat.targetsFor(kind).filter { hasAudio || it.kind != MediaKind.AUDIO }
+    fun targets(): List<OutputFormat> = OutputFormat.targetsFor(kind, hasAudio)
 }
 
 /** Alle Stellschrauben einer Umwandlung. Die Vorgaben ([Preset]) befüllen sie nur. */
@@ -165,4 +169,20 @@ object Bitrate {
         if (sourceBitrate == null || sourceBitrate <= 0) return requested
         return minOf(requested, maxOf(sourceBitrate, MIN_VIDEO))
     }
+}
+
+/** Zielformate, die für alle Dateien eines Stapels funktionieren (leer = Mischung passt nicht). */
+fun commonTargets(files: List<InputFile>): List<OutputFormat> = OutputFormat.intersect(files.map { it.targets() })
+
+/** Ergebnis einer Datei aus einem Stapel. Entweder [outputUri] oder [error] ist gesetzt. */
+data class FileResult(
+    val inputName: String,
+    val inputSize: Long,
+    val outputUri: Uri?,
+    val outputName: String?,
+    val outputSize: Long,
+    val mimeType: String,
+    val error: String?,
+) {
+    val ok get() = outputUri != null
 }

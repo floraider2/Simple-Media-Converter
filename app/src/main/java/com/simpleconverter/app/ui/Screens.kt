@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
@@ -76,6 +77,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.simpleconverter.app.data.formatDuration
 import com.simpleconverter.app.data.formatSize
 import com.simpleconverter.app.model.ConversionSettings
+import com.simpleconverter.app.model.FileResult
+import com.simpleconverter.app.model.commonTargets
 import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
@@ -89,6 +92,7 @@ fun ConverterApp(vm: ConverterViewModel) {
     val screen by vm.screen.collectAsStateWithLifecycle()
     val recents by vm.recents.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val loading by vm.loading.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(message) {
@@ -124,17 +128,17 @@ fun ConverterApp(vm: ConverterViewModel) {
             .fillMaxSize()
             .padding(padding)
         when (val s = screen) {
-            Screen.Home -> HomeScreen(recents, vm::openFile, vm::clearRecents, modifier)
+            Screen.Home -> HomeScreen(recents, loading, vm::openFiles, vm::clearRecents, modifier)
             is Screen.Setup -> SetupScreen(s, vm, modifier)
             is Screen.Working -> WorkingScreen(s, vm::cancelConversion, modifier)
-            is Screen.Done -> DoneScreen(s, vm::goHome, modifier)
+            is Screen.Done -> DoneScreen(s, vm::goHome, vm::backToSetup, modifier)
             is Screen.Failed -> FailedScreen(s, vm::backToSetup, vm::goHome, modifier)
         }
     }
 }
 
 private fun titleFor(screen: Screen) = when (screen) {
-    is Screen.Setup -> screen.file.name
+    is Screen.Setup -> if (screen.files.size == 1) screen.files.first().name else "${screen.files.size} Dateien"
     is Screen.Working -> "Wird umgewandelt …"
     is Screen.Done -> "Fertig"
     is Screen.Failed -> "Fehler"
@@ -146,21 +150,23 @@ private fun titleFor(screen: Screen) = when (screen) {
 @Composable
 private fun HomeScreen(
     recents: List<RecentItem>,
-    onPick: (Uri) -> Unit,
+    loading: Boolean,
+    onPick: (List<Uri>) -> Unit,
     onClearRecents: () -> Unit,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
-    val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let(onPick)
+    val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(MAX_FILES)) { uris ->
+        onPick(uris)
     }
-    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        // Dauerhafte Leserechte: so kann die Umwandlung auch ohne offene App weiterlaufen.
+        uris.forEach { uri ->
             runCatching {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            onPick(uri)
         }
+        onPick(uris)
     }
 
     LazyColumn(modifier = modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -189,6 +195,11 @@ private fun HomeScreen(
                         Spacer(Modifier.size(8.dp))
                         Text("Datei suchen (auch Musik)")
                     }
+                    Text(
+                        "Mehrere Dateien auf einmal? Einfach mehrere auswählen.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
         }
@@ -246,16 +257,21 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
     var advanced by rememberSaveable { mutableStateOf(false) }
     val presets = Presets.forFormat(s.format)
 
+    // Der Knopf „Umwandeln“ bleibt unten fest stehen, nur die Einstellungen scrollen.
+    Column(modifier) {
     Column(
-        modifier
+        Modifier
+            .weight(1f)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        FileHeader(s.file)
-        if (s.file.kind == MediaKind.VIDEO && !s.file.hasAudio) {
+        val first = s.files.first()
+        if (s.files.size == 1) FileHeader(first) else BatchHeader(s.files, vm::removeFile)
+        if (s.files.any { it.kind == MediaKind.VIDEO && !it.hasAudio }) {
             Text(
-                "Dieses Video hat keine Tonspur.",
+                if (s.files.size == 1) "Dieses Video hat keine Tonspur."
+                else "Mindestens ein Video hat keine Tonspur, deshalb gibt es kein „Nur Ton“.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -263,11 +279,11 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
 
         Section("Zielformat") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                s.file.targets().forEach { format ->
+                commonTargets(s.files).forEach { format ->
                     FilterChip(
                         selected = format == s.format,
                         onClick = { vm.selectFormat(format) },
-                        label = { Text(if (s.file.kind == MediaKind.VIDEO && format.kind == MediaKind.AUDIO) "Nur Ton: ${format.label}" else format.label) },
+                        label = { Text(if (first.kind == MediaKind.VIDEO && format.kind == MediaKind.AUDIO) "Nur Ton: ${format.label}" else format.label) },
                     )
                 }
             }
@@ -322,11 +338,17 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
                 Icon(if (advanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null)
             }
             AnimatedVisibility(advanced) {
-                AdvancedOptions(s.format, s.settings, s.file, vm::updateSettings)
+                AdvancedOptions(
+                    format = s.format,
+                    settings = s.settings,
+                    allHaveDuration = s.files.all { it.durationMs != null },
+                    allHaveAudio = s.files.all { it.hasAudio },
+                    update = vm::updateSettings,
+                )
             }
         }
 
-        if (s.file.kind == MediaKind.IMAGE) {
+        if (first.kind == MediaKind.IMAGE) {
             Text(
                 "🔒 Standort, Kameradaten und andere EXIF-Infos werden beim Umwandeln entfernt.",
                 style = MaterialTheme.typography.bodySmall,
@@ -334,9 +356,17 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
             )
         }
 
-        Button(onClick = vm::startConversion, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            Text("Umwandeln")
-        }
+    }
+    HorizontalDivider()
+    Button(
+        onClick = vm::startConversion,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .height(52.dp),
+    ) {
+        Text(if (s.files.size == 1) "Umwandeln" else "${s.files.size} Dateien umwandeln")
+    }
     }
 }
 
@@ -347,7 +377,8 @@ private fun hasAdvanced(format: OutputFormat) = format != OutputFormat.WAV
 private fun AdvancedOptions(
     format: OutputFormat,
     settings: ConversionSettings,
-    file: InputFile,
+    allHaveDuration: Boolean,
+    allHaveAudio: Boolean,
     update: ((ConversionSettings) -> ConversionSettings) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -358,7 +389,7 @@ private fun AdvancedOptions(
                     listOf(null to "Original", 1080 to "1080p", 720 to "720p", 480 to "480p"),
                     settings.videoShortSide,
                 ) { v -> update { it.copy(videoShortSide = v) } }
-                if (file.durationMs != null) {
+                if (allHaveDuration) {
                     val mb = 1024L * 1024L
                     ChipGroup(
                         "Zielgröße",
@@ -373,7 +404,7 @@ private fun AdvancedOptions(
                         settings.videoBitrate,
                     ) { v -> update { it.copy(videoBitrate = v) } }
                 }
-                if (file.hasAudio) {
+                if (allHaveAudio) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Ton entfernen", modifier = Modifier.weight(1f))
                         Switch(checked = settings.removeAudio, onCheckedChange = { c -> update { it.copy(removeAudio = c) } })
@@ -444,6 +475,48 @@ private fun FileHeader(file: InputFile) {
 }
 
 @Composable
+private fun BatchHeader(files: List<InputFile>, onRemove: (InputFile) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val shown = if (expanded) files else files.take(3)
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(emojiFor(files.first().kind), style = MaterialTheme.typography.headlineMedium)
+                Spacer(Modifier.size(16.dp))
+                Column {
+                    Text("${files.size} Dateien", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "zusammen ${formatSize(files.sumOf { it.size })}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            shown.forEach { file ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${file.name} · ${formatSize(file.size)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { onRemove(file) }) {
+                        Icon(Icons.Default.Close, contentDescription = "${file.name} entfernen")
+                    }
+                }
+            }
+            if (files.size > 3) {
+                TextButton(onClick = { expanded = !expanded }) {
+                    Text(if (expanded) "Weniger anzeigen" else "Alle ${files.size} anzeigen")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
@@ -460,14 +533,18 @@ private fun WorkingScreen(s: Screen.Working, onCancel: () -> Unit, modifier: Mod
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(emojiFor(s.file.kind), style = MaterialTheme.typography.displayMedium)
-        Text("${s.file.name} → ${s.format.label}", textAlign = TextAlign.Center)
+        val current = s.files.getOrElse(s.index) { s.files.first() }
+        Text(emojiFor(current.kind), style = MaterialTheme.typography.displayMedium)
+        if (s.files.size > 1) {
+            Text("Datei ${s.index + 1} von ${s.files.size}", style = MaterialTheme.typography.titleMedium)
+        }
+        Text("${current.name} → ${s.format.label}", textAlign = TextAlign.Center)
         if (s.preparing) {
             Text("Datei wird vorbereitet …", style = MaterialTheme.typography.bodyMedium)
         }
-        if (s.progress > 0) {
-            LinearProgressIndicator(progress = { s.progress / 100f }, modifier = Modifier.fillMaxWidth())
-            Text("${s.progress} %", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        if (s.overall > 0) {
+            LinearProgressIndicator(progress = { s.overall / 100f }, modifier = Modifier.fillMaxWidth())
+            Text("${s.overall} %", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         } else {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
@@ -482,7 +559,17 @@ private fun WorkingScreen(s: Screen.Working, onCancel: () -> Unit, modifier: Mod
 }
 
 @Composable
-private fun DoneScreen(s: Screen.Done, onAnother: () -> Unit, modifier: Modifier) {
+private fun DoneScreen(s: Screen.Done, onAnother: () -> Unit, onRetry: () -> Unit, modifier: Modifier) {
+    val single = s.results.singleOrNull()
+    when {
+        single != null && single.ok -> SingleDone(single, onAnother, modifier)
+        single != null -> FailedScreen(Screen.Failed(s.files, single.error ?: ""), onRetry, onAnother, modifier)
+        else -> BatchDone(s.results, onAnother, modifier)
+    }
+}
+
+@Composable
+private fun SingleDone(r: FileResult, onAnother: () -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     Column(
         modifier.padding(24.dp),
@@ -490,9 +577,9 @@ private fun DoneScreen(s: Screen.Done, onAnother: () -> Unit, modifier: Modifier
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(72.dp))
-        Text(s.outputName, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-        Text("${formatSize(s.file.size)} → ${formatSize(s.outputSize)}", style = MaterialTheme.typography.titleMedium)
-        if (s.outputSize > s.file.size) {
+        Text(r.outputName ?: "", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text("${formatSize(r.inputSize)} → ${formatSize(r.outputSize)}", style = MaterialTheme.typography.titleMedium)
+        if (r.outputSize > r.inputSize) {
             Text(
                 "Die neue Datei ist größer als das Original – das Original war schon stark komprimiert. " +
                     "Für eine kleinere Datei probiere „Kleinste Datei“ oder ein anderes Format.",
@@ -502,14 +589,82 @@ private fun DoneScreen(s: Screen.Done, onAnother: () -> Unit, modifier: Modifier
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { shareOutput(context, s.outputUri, s.mimeType) }) {
+            Button(onClick = { shareOutputs(context, listOf(r.outputUri!!), r.mimeType) }) {
                 Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Text("Teilen")
             }
-            FilledTonalButton(onClick = { openOutput(context, s.outputUri, s.mimeType) }) { Text("Öffnen") }
+            FilledTonalButton(onClick = { openOutput(context, r.outputUri!!, r.mimeType) }) { Text("Öffnen") }
         }
         TextButton(onClick = onAnother) { Text("Noch eine Datei") }
+    }
+}
+
+@Composable
+private fun BatchDone(results: List<FileResult>, onAnother: () -> Unit, modifier: Modifier) {
+    val context = LocalContext.current
+    val ok = results.filter { it.ok }
+    val allOk = ok.size == results.size
+    LazyColumn(
+        modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    if (allOk) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = if (allOk) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(56.dp),
+                )
+                Text(
+                    if (allOk) "${results.size} Dateien fertig" else "${ok.size} von ${results.size} Dateien fertig",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                if (ok.isNotEmpty()) {
+                    Text(
+                        "${formatSize(ok.sumOf { it.inputSize })} → ${formatSize(ok.sumOf { it.outputSize })}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Button(onClick = { shareOutputs(context, ok.map { it.outputUri!! }, ok.first().mimeType) }) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Alle teilen")
+                    }
+                }
+                TextButton(onClick = onAnother) { Text("Noch eine Datei") }
+            }
+        }
+        items(results) { r ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = r.ok) { openOutput(context, r.outputUri!!, r.mimeType) }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(r.outputName ?: r.inputName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (r.ok) "${formatSize(r.inputSize)} → ${formatSize(r.outputSize)}" else r.error ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (r.ok) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    )
+                }
+                Icon(
+                    if (r.ok) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = if (r.ok) "fertig" else "fehlgeschlagen",
+                    tint = if (r.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
@@ -542,13 +697,18 @@ private fun emojiForMime(mime: String) = when {
     else -> "🖼️"
 }
 
-private fun shareOutput(context: Context, uri: Uri, mime: String) {
-    val send = Intent(Intent.ACTION_SEND)
-        .setType(mime)
-        .putExtra(Intent.EXTRA_STREAM, uri)
-        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+private fun shareOutputs(context: Context, uris: List<Uri>, mime: String) {
+    val send = if (uris.size == 1) {
+        Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.first())
+    } else {
+        Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+    }
+    send.setType(mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     context.startActivity(Intent.createChooser(send, "Teilen"))
 }
+
+/** Obergrenze für die Mehrfachauswahl im Photo Picker. */
+private const val MAX_FILES = 100
 
 private fun openOutput(context: Context, uri: Uri, mime: String) {
     val view = Intent(Intent.ACTION_VIEW)

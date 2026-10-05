@@ -3,6 +3,7 @@ package com.simpleconverter.app.ui
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.OneTimeWorkRequestBuilder
@@ -11,12 +12,14 @@ import androidx.work.WorkManager
 import com.simpleconverter.app.data.FileInspector
 import com.simpleconverter.app.data.RecentStore
 import com.simpleconverter.app.model.ConversionSettings
+import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.OutputFormat
 import com.simpleconverter.app.model.Presets
 import com.simpleconverter.app.model.RecentItem
-import com.simpleconverter.app.work.ActiveJobStore
+import com.simpleconverter.app.model.commonTargets
 import com.simpleconverter.app.work.ConversionWorker
+import com.simpleconverter.app.work.JobStore
 import com.simpleconverter.app.work.Notifications
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,28 +33,25 @@ import java.util.UUID
 sealed interface Screen {
     data object Home : Screen
     data class Setup(
-        val file: InputFile,
+        val files: List<InputFile>,
         val format: OutputFormat,
         /** null = „Eigene“ Einstellungen. */
         val presetId: String?,
         val settings: ConversionSettings,
     ) : Screen
     data class Working(
-        val file: InputFile,
+        val files: List<InputFile>,
         val format: OutputFormat,
-        val progress: Int,
         val workId: UUID,
+        /** Index der Datei, die gerade dran ist. */
+        val index: Int = 0,
+        /** Fortschritt über den ganzen Stapel. */
+        val overall: Int = 0,
         /** true, solange eine geteilte Datei erst in den Cache kopiert wird. */
         val preparing: Boolean = false,
     ) : Screen
-    data class Done(
-        val file: InputFile,
-        val outputUri: Uri,
-        val outputName: String,
-        val outputSize: Long,
-        val mimeType: String,
-    ) : Screen
-    data class Failed(val file: InputFile, val message: String) : Screen
+    data class Done(val files: List<InputFile>, val results: List<FileResult>) : Screen
+    data class Failed(val files: List<InputFile>, val message: String) : Screen
 }
 
 class ConverterViewModel(app: Application) : AndroidViewModel(app) {
@@ -67,6 +67,10 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    /** true, solange ausgewählte Dateien untersucht werden. */
+    private val _loading = MutableStateFlow(false)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
     private var observeJob: Job? = null
 
     init {
@@ -76,40 +80,60 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Läuft noch eine Umwandlung aus einer früheren Sitzung? Dann dort weitermachen. */
     private fun restoreActiveJob() {
-        val job = ActiveJobStore.load(getApplication()) ?: return
-        _screen.value = Screen.Working(job.file, job.format, 0, job.workId)
-        observe(job.workId, job.file, job.format)
+        val id = JobStore.active(getApplication()) ?: return
+        val job = JobStore.loadJob(getApplication(), id)
+        if (job == null) {
+            JobStore.setActive(getApplication(), null)
+            return
+        }
+        _screen.value = Screen.Working(job.files, job.settings.format, id)
+        observe(id, job.files, job.settings.format)
     }
 
-    /** Eingehende Teilen-/Öffnen-Intents. */
+    /** Eingehende Teilen-/Öffnen-Intents (eine oder mehrere Dateien). */
     fun handleIntent(intent: Intent?) {
-        val uri = when (intent?.action) {
-            Intent.ACTION_SEND -> intent.streamUri()
-            Intent.ACTION_VIEW -> intent.data
-            else -> null
-        } ?: return
+        val uris = when (intent?.action) {
+            Intent.ACTION_SEND -> listOfNotNull(intent.streamUri() ?: intent.clipData?.getItemAt(0)?.uri)
+            Intent.ACTION_SEND_MULTIPLE -> intent.streamUris()
+            Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+            else -> emptyList()
+        }
+        if (uris.isEmpty()) return
         if (_screen.value is Screen.Working) {
             _message.value = "Es läuft bereits eine Umwandlung."
             return
         }
-        openFile(uri)
+        openFiles(uris)
     }
 
-    fun openFile(uri: Uri) {
+    fun openFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         viewModelScope.launch {
-            val file = withContext(Dispatchers.IO) { FileInspector.inspect(getApplication(), uri) }
-            if (file == null) {
-                _message.value = "Diese Datei ist kein Video, Audio oder Bild."
-                return@launch
+            _loading.value = true
+            val inspected = withContext(Dispatchers.IO) {
+                uris.distinct().map { FileInspector.inspect(getApplication(), it) }
             }
-            val format = file.targets().first()
-            _screen.value = setupFor(file, format)
+            _loading.value = false
+            val files = inspected.filterNotNull()
+            val skipped = inspected.size - files.size
+            val targets = commonTargets(files)
+            when {
+                files.isEmpty() ->
+                    _message.value = if (uris.size == 1) "Diese Datei ist kein Video, Audio oder Bild."
+                    else "Keine der Dateien ist ein Video, Audio oder Bild."
+                targets.isEmpty() ->
+                    _message.value = "Bilder lassen sich nicht zusammen mit Videos oder Musik umwandeln. Bitte getrennt auswählen."
+                else -> {
+                    if (skipped > 0) _message.value = "$skipped Datei(en) übersprungen – kein Video, Audio oder Bild."
+                    _screen.value = setupFor(files, targets.first())
+                }
+            }
         }
     }
 
     fun selectFormat(format: OutputFormat) {
         val current = _screen.value as? Screen.Setup ?: return
-        _screen.value = setupFor(current.file, format)
+        _screen.value = setupFor(current.files, format)
     }
 
     fun selectPreset(id: String) {
@@ -126,15 +150,31 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         _screen.value = current.copy(settings = updated, presetId = matching?.id)
     }
 
+    /** Eine Datei aus dem Stapel entfernen. */
+    fun removeFile(file: InputFile) {
+        val current = _screen.value as? Screen.Setup ?: return
+        val remaining = current.files - file
+        if (remaining.isEmpty()) {
+            goHome()
+            return
+        }
+        val targets = commonTargets(remaining)
+        _screen.value = if (current.format in targets) current.copy(files = remaining) else setupFor(remaining, targets.first())
+    }
+
     fun startConversion() {
         val setup = _screen.value as? Screen.Setup ?: return
-        val request = OneTimeWorkRequestBuilder<ConversionWorker>()
-            .setInputData(ConversionWorker.inputData(setup.file, setup.settings))
-            .build()
-        workManager.enqueue(request)
-        ActiveJobStore.save(getApplication(), ActiveJobStore.ActiveJob(request.id, setup.file, setup.format))
-        _screen.value = Screen.Working(setup.file, setup.format, 0, request.id)
-        observe(request.id, setup.file, setup.format)
+        val id = UUID.randomUUID()
+        JobStore.saveJob(getApplication(), JobStore.Job(id, setup.files, setup.settings))
+        workManager.enqueue(
+            OneTimeWorkRequestBuilder<ConversionWorker>()
+                .setId(id)
+                .setInputData(ConversionWorker.inputData(id))
+                .build()
+        )
+        JobStore.setActive(getApplication(), id)
+        _screen.value = Screen.Working(setup.files, setup.format, id)
+        observe(id, setup.files, setup.format)
     }
 
     fun cancelConversion() {
@@ -149,12 +189,12 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun backToSetup() {
-        val file = when (val s = _screen.value) {
-            is Screen.Failed -> s.file
-            is Screen.Done -> s.file
+        val files = when (val s = _screen.value) {
+            is Screen.Failed -> s.files
+            is Screen.Done -> s.files
             else -> return
         }
-        _screen.value = setupFor(file, file.targets().first())
+        _screen.value = setupFor(files, commonTargets(files).first())
     }
 
     fun clearRecents() {
@@ -173,54 +213,56 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         _message.value = null
     }
 
-    private fun observe(id: UUID, file: InputFile, format: OutputFormat) {
+    private fun observe(id: UUID, files: List<InputFile>, format: OutputFormat) {
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
             workManager.getWorkInfoByIdFlow(id).collect { info ->
                 if (info == null) {
-                    // Job existiert nicht mehr (z. B. von WorkManager aufgeräumt).
-                    ActiveJobStore.clear(getApplication())
+                    // Auftrag existiert nicht mehr (z. B. von WorkManager aufgeräumt).
+                    JobStore.setActive(getApplication(), null)
                     _screen.value = Screen.Home
                     observeJob?.cancel()
                     return@collect
                 }
-                if (info.state.isFinished) ActiveJobStore.clear(getApplication())
+                if (info.state.isFinished) JobStore.setActive(getApplication(), null)
                 when (info.state) {
                     WorkInfo.State.SUCCEEDED -> {
-                        val out = info.outputData
-                        _screen.value = Screen.Done(
-                            file = file,
-                            outputUri = Uri.parse(out.getString(ConversionWorker.KEY_OUTPUT_URI)),
-                            outputName = out.getString(ConversionWorker.KEY_OUTPUT_NAME) ?: "",
-                            outputSize = out.getLong(ConversionWorker.KEY_OUTPUT_SIZE, 0L),
-                            mimeType = out.getString(ConversionWorker.KEY_OUTPUT_MIME) ?: "*/*",
-                        )
+                        val results = withContext(Dispatchers.IO) { JobStore.loadResults(getApplication(), id) }
+                        _screen.value = Screen.Done(files, results)
                         refreshRecents()
                         observeJob?.cancel()
                     }
                     WorkInfo.State.FAILED -> {
                         val error = info.outputData.getString(ConversionWorker.KEY_ERROR) ?: "Unbekannter Fehler"
-                        _screen.value = Screen.Failed(file, error)
+                        _screen.value = Screen.Failed(files, error)
                         observeJob?.cancel()
                     }
                     WorkInfo.State.CANCELLED -> {
-                        _message.value = "Umwandlung abgebrochen."
-                        _screen.value = setupFor(file, format)
+                        val done = withContext(Dispatchers.IO) { JobStore.loadResults(getApplication(), id) }.count { it.ok }
+                        _message.value = if (done > 0) "Abgebrochen – $done Datei(en) waren schon fertig." else "Umwandlung abgebrochen."
+                        _screen.value = setupFor(files, format)
+                        refreshRecents()
                         observeJob?.cancel()
                     }
                     else -> {
-                        val progress = info.progress.getInt(ConversionWorker.KEY_PROGRESS, 0)
-                        val preparing = info.progress.getString(ConversionWorker.KEY_PHASE) == ConversionWorker.PHASE_COPY
-                        _screen.value = Screen.Working(file, format, progress, id, preparing)
+                        val p = info.progress
+                        _screen.value = Screen.Working(
+                            files = files,
+                            format = format,
+                            workId = id,
+                            index = p.getInt(ConversionWorker.KEY_INDEX, 0),
+                            overall = p.getInt(ConversionWorker.KEY_OVERALL, 0),
+                            preparing = p.getString(ConversionWorker.KEY_PHASE) == ConversionWorker.PHASE_COPY,
+                        )
                     }
                 }
             }
         }
     }
 
-    private fun setupFor(file: InputFile, format: OutputFormat): Screen.Setup {
+    private fun setupFor(files: List<InputFile>, format: OutputFormat): Screen.Setup {
         val first = Presets.forFormat(format).first()
-        return Screen.Setup(file, format, first.id, first.settings)
+        return Screen.Setup(files, format, first.id, first.settings)
     }
 
     private fun refreshRecents() {
@@ -231,6 +273,15 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
 
     @Suppress("DEPRECATION")
     private fun Intent.streamUri(): Uri? =
-        if (android.os.Build.VERSION.SDK_INT >= 33) getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        if (Build.VERSION.SDK_INT >= 33) getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         else getParcelableExtra(Intent.EXTRA_STREAM)
+
+    @Suppress("DEPRECATION")
+    private fun Intent.streamUris(): List<Uri> {
+        val extra = if (Build.VERSION.SDK_INT >= 33) getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        else getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+        if (!extra.isNullOrEmpty()) return extra
+        val clip = clipData ?: return emptyList()
+        return (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
+    }
 }

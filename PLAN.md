@@ -1,6 +1,8 @@
 # Simple Converter – Projektplan
 
-Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 14 Unit-Tests grün, Lint sauber, erster Gerätetest auf Galaxy S24 Ultra / Android 16 bestanden)
+Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests + 4 Geräte-Tests grün, Lint sauber, getestet auf Galaxy S24 Ultra / Android 16)
+
+**Aktueller Schwerpunkt:** v0.2 – Stapelverarbeitung ist fertig, als Nächstes FFmpeg.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Arbeits-Branch: `media3-v0.1`
 
@@ -160,12 +162,13 @@ Ziel: v0.1 läuft zuverlässig auf echten Geräten.
 ### v0.2 – Stapel, mehr Formate (3–4 Wochen)
 
 **Stapelverarbeitung**
-- [ ] `ACTION_SEND_MULTIPLE` im Manifest und ViewModel
-- [ ] `PickMultipleVisualMedia` und `OpenMultipleDocuments` in der App
-- [ ] Setup-Bildschirm für mehrere Dateien (gemeinsames Zielformat; nur Formate, die alle Eingaben können)
-- [ ] Ein `BatchWorker`, der die Liste nacheinander abarbeitet (nicht parallel – Hardware-Encoder sind begrenzt)
-- [ ] Fortschritt „Datei 12 von 50 · 34 %“ in UI und Benachrichtigung
-- [ ] Ergebnis: Liste mit „Alle teilen“
+- [x] `ACTION_SEND_MULTIPLE` im Manifest und ViewModel
+- [x] `PickMultipleVisualMedia` (bis 100) und `OpenMultipleDocuments` in der App
+- [x] Setup-Bildschirm für mehrere Dateien (gemeinsames Zielformat; nur Formate, die alle Eingaben können; einzelne Dateien entfernbar)
+- [x] Ein Worker, der die Liste nacheinander abarbeitet (nicht parallel – Hardware-Encoder sind begrenzt); eine kaputte Datei stoppt den Rest nicht; Auftrag als JSON in `files/jobs/` (WorkManager-Data hat nur 10 KB)
+- [x] Fortschritt „Datei 12 von 50 · 34 %“ in UI und Benachrichtigung
+- [x] Ergebnis: Liste mit „Alle teilen“, Fehler je Datei sichtbar
+- [x] Geteilte Dateien eines Stapels werden vorab in den Cache kopiert, wenn genug Platz frei ist
 
 **FFmpeg-Engine**
 - [ ] Android NDK installieren (r27+)
@@ -250,7 +253,7 @@ Ab v0.2 zusätzlich: Mehrfachauswahl → Einstellungen gelten für alle → Fort
 |---|---|---|
 | Unit | Bitrate aus Zielgröße, Vorgaben, Settings-Serialisierung, Dateinamen | JUnit |
 | Unit | ViewModel-Zustände (Setup → Working → Done/Failed/Cancelled) | JUnit + Turbine + WorkManager-Testing |
-| Instrumentiert | Je Konverter eine echte Umwandlung mit kleinen Testdateien in `androidTest/assets` | AndroidX Test auf Emulator |
+| Instrumentiert | ✅ `BatchConversionTest`: Teilen an die App (SEND_MULTIPLE) → Umwandeln → Ergebnis prüfen; Audio-Stapel, Bild-Stapel, kaputte Datei im Stapel, gemischte Typen abgelehnt. Testdateien erzeugt der Test selbst. Start: `./gradlew connectedDebugAndroidTest` | AndroidX Test + UiAutomator auf Gerät/Emulator |
 | CI | `assembleDebug`, `lintDebug`, Unit-Tests bei jedem Push | GitHub Actions / Forgejo Actions |
 
 ### 7.1 Gerätetest 05.10.2026 – Galaxy S24 Ultra (SM-S928B), Android 16
@@ -270,6 +273,9 @@ Gesteuert per adb mit selbst erzeugten Testdateien (Ton-WAV, Bildschirmaufnahme,
 | 9 | „Öffnen mit“ (ACTION_VIEW) | ✅ |
 | 10 | Teilen aus Galerie/WhatsApp (ACTION_SEND) | ✅ manuell: PNG aus der Galerie geteilt → JPG, Cache-Kopie danach entfernt |
 | 11 | Video **mit** Ton | ⏳ fehlt noch (Bildschirmaufnahmen haben keinen Ton) |
+
+**Stapelverarbeitung (v0.2)** – `BatchConversionTest` 4/4 grün, Einzeldatei-Testreihe erneut bestanden.
+Gefunden: Bei Bild-Stapeln lag „Umwandeln“ unter dem Bildschirmrand → Knopf steht jetzt fest unten.
 
 **Gefunden und behoben**
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.

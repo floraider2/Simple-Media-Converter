@@ -20,6 +20,7 @@ import com.simpleconverter.app.convert.WavConverter
 import com.simpleconverter.app.data.RecentStore
 import com.simpleconverter.app.data.formatSize
 import com.simpleconverter.app.model.ConversionSettings
+import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.OutputFormat
 import com.simpleconverter.app.model.RecentItem
@@ -31,94 +32,151 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 
-/** Führt eine Umwandlung im Hintergrund aus, mit Fortschritt in der Benachrichtigungsleiste. */
+/**
+ * Wandelt einen Stapel von Dateien nacheinander um (eine einzelne Datei ist ein Stapel mit
+ * einem Eintrag). Nacheinander statt parallel, weil Hardware-Encoder begrenzt sind.
+ * Schlägt eine Datei fehl, geht es mit der nächsten weiter.
+ */
 class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
-    private data class Status(val phase: String, val progress: Int)
+    private data class Status(val index: Int, val count: Int, val name: String, val phase: String, val progress: Int) {
+        /** Fortschritt über den ganzen Stapel. */
+        val overall get() = ((index * 100 + progress) / count).coerceIn(0, 100)
+    }
 
     override suspend fun doWork(): Result {
         val context = applicationContext
-        val original = Uri.parse(inputData.getString(KEY_INPUT_URI))
-        val inputName = inputData.getString(KEY_INPUT_NAME) ?: "datei"
-        val inputSize = inputData.getLong(KEY_INPUT_SIZE, 0L)
-        val durationMs = inputData.getLong(KEY_DURATION, 0L).takeIf { it > 0 }
-        val settings = ConversionSettings.fromData(inputData)
-        val outputName = outputFileName(inputName, settings.format)
+        val jobId = inputData.getString(KEY_JOB_ID)?.let(UUID::fromString) ?: return Result.failure()
+        val job = JobStore.loadJob(context, jobId)
+            ?: return Result.failure(workDataOf(KEY_ERROR to "Auftrag nicht gefunden."))
+        val files = job.files
+        val count = files.size
 
         Notifications.createChannels(context)
         InputCache.cleanup(context)
+        JobStore.cleanup(context, keep = jobId)
         Notifications.cancelResult(context)
-        runCatching { setForeground(foregroundInfo(outputName, Status(PHASE_CONVERT, 0))) }
+        val status = MutableStateFlow(Status(0, count, files.first().name, PHASE_CONVERT, 0))
+        runCatching { setForeground(foregroundInfo(status.value)) }
 
-        val outDir = File(context.cacheDir, "out").apply { mkdirs() }
-        val temp = File(outDir, "$id.${settings.format.extension}")
-        var copiedInput: File? = null
-        val status = MutableStateFlow(Status(PHASE_CONVERT, 0))
+        val copies = mutableMapOf<Int, File>()
+        val results = mutableListOf<FileResult>()
 
         return coroutineScope {
             val reporter = launch {
                 status.collect { s ->
-                    setProgress(workDataOf(KEY_PROGRESS to s.progress, KEY_PHASE to s.phase))
-                    Notifications.update(context, Notifications.ID_PROGRESS, progressNotification(outputName, s))
+                    setProgress(
+                        workDataOf(
+                            KEY_INDEX to s.index, KEY_COUNT to s.count, KEY_NAME to s.name,
+                            KEY_PHASE to s.phase, KEY_PROGRESS to s.progress, KEY_OVERALL to s.overall,
+                        )
+                    )
+                    Notifications.update(context, Notifications.ID_PROGRESS, progressNotification(s))
                 }
             }
             try {
-                val input = if (InputCache.needsCopy(context, original)) {
-                    status.value = Status(PHASE_COPY, 0)
-                    InputCache.copy(context, original, inputName) { status.value = Status(PHASE_COPY, it) }
-                        .also { copiedInput = it }
-                        .let(Uri::fromFile)
-                } else {
-                    original
-                }
-                status.value = Status(PHASE_CONVERT, 0)
-                val onProgress: (Int) -> Unit = { status.value = Status(PHASE_CONVERT, it) }
+                prepareInputs(files, copies) { i, p -> status.value = Status(i, count, files[i].name, PHASE_COPY, p) }
 
-                when (settings.format) {
-                    OutputFormat.MP4, OutputFormat.M4A ->
-                        VideoConverter.convert(context, input, temp, settings, durationMs, onProgress)
-                    OutputFormat.WAV ->
-                        WavConverter.convert(context, input, temp, onProgress)
-                    OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP ->
-                        ImageConverter.convert(context, input, temp, settings)
+                files.forEachIndexed { i, file ->
+                    status.value = Status(i, count, file.name, PHASE_CONVERT, 0)
+                    results += convertOne(
+                        file, copies[i], job.settings,
+                        onCopy = { p -> status.value = Status(i, count, file.name, PHASE_COPY, p) },
+                        onProgress = { p -> status.value = Status(i, count, file.name, PHASE_CONVERT, p) },
+                    )
+                    copies.remove(i)?.delete()
+                    JobStore.saveResults(context, jobId, results)
                 }
 
-                val outputSize = temp.length()
-                val outputUri = OutputStore.save(context, temp, outputName, settings.format)
-                RecentStore.add(
-                    context,
-                    RecentItem(
-                        inputName, outputName, outputUri, settings.format.mimeType,
-                        inputSize, outputSize, System.currentTimeMillis(),
-                    ),
-                )
-                if (!appInForeground()) {
-                    Notifications.done(
-                        context, outputName, "${formatSize(inputSize)} → ${formatSize(outputSize)}",
-                        outputUri, settings.format.mimeType,
-                    )
-                }
-                Result.success(
-                    workDataOf(
-                        KEY_OUTPUT_URI to outputUri.toString(),
-                        KEY_OUTPUT_NAME to outputName,
-                        KEY_OUTPUT_SIZE to outputSize,
-                        KEY_OUTPUT_MIME to settings.format.mimeType,
-                    )
-                )
+                if (!appInForeground()) notifyFinished(results)
+                Result.success(workDataOf(KEY_JOB_ID to jobId.toString()))
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
-                // Throwable statt Exception: auch OutOfMemoryError bei riesigen Bildern abfangen.
                 val message = ErrorMessages.forThrowable(t)
-                if (!appInForeground()) Notifications.failed(context, inputName, message)
+                if (!appInForeground()) Notifications.failed(context, files.first().name, message)
                 Result.failure(workDataOf(KEY_ERROR to message))
             } finally {
                 reporter.cancel()
-                temp.delete()
-                copiedInput?.delete()
+                copies.values.forEach { it.delete() }
             }
+        }
+    }
+
+    /**
+     * Geteilte Dateien dürfen wir nur lesen, solange die Activity lebt. Wenn genug Platz ist,
+     * kopieren wir deshalb alle vorab; sonst einzeln direkt vor der Umwandlung (siehe [convertOne]).
+     */
+    private suspend fun prepareInputs(files: List<InputFile>, copies: MutableMap<Int, File>, onProgress: (Int, Int) -> Unit) {
+        val context = applicationContext
+        val toCopy = files.indices.filter { InputCache.needsCopy(context, files[it].uri) }
+        if (toCopy.size < 2) return
+        val needed = toCopy.sumOf { files[it].size }
+        val free = context.cacheDir.usableSpace - RESERVE_BYTES
+        if (needed > free) return
+        for (i in toCopy) {
+            copies[i] = InputCache.copy(context, files[i].uri, files[i].name) { onProgress(i, it) }
+        }
+    }
+
+    private suspend fun convertOne(
+        file: InputFile,
+        preparedCopy: File?,
+        settings: ConversionSettings,
+        onCopy: (Int) -> Unit,
+        onProgress: (Int) -> Unit,
+    ): FileResult {
+        val context = applicationContext
+        val outputName = outputFileName(file.name, settings.format)
+        val temp = File(File(context.cacheDir, "out").apply { mkdirs() }, "${UUID.randomUUID()}.${settings.format.extension}")
+        var lateCopy: File? = null
+        return try {
+            val input: Uri = when {
+                preparedCopy != null -> Uri.fromFile(preparedCopy)
+                InputCache.needsCopy(context, file.uri) ->
+                    InputCache.copy(context, file.uri, file.name, onCopy).also { lateCopy = it }.let(Uri::fromFile)
+                else -> file.uri
+            }
+            onProgress(0)
+            when (settings.format) {
+                OutputFormat.MP4, OutputFormat.M4A ->
+                    VideoConverter.convert(context, input, temp, settings, file.durationMs, onProgress)
+                OutputFormat.WAV -> WavConverter.convert(context, input, temp, onProgress)
+                OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP ->
+                    ImageConverter.convert(context, input, temp, settings)
+            }
+            val outputSize = temp.length()
+            val outputUri = OutputStore.save(context, temp, outputName, settings.format)
+            RecentStore.add(
+                context,
+                RecentItem(file.name, outputName, outputUri, settings.format.mimeType, file.size, outputSize, System.currentTimeMillis()),
+            )
+            FileResult(file.name, file.size, outputUri, outputName, outputSize, settings.format.mimeType, null)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            // Throwable statt Exception: auch OutOfMemoryError bei riesigen Bildern abfangen.
+            FileResult(file.name, file.size, null, null, 0L, settings.format.mimeType, ErrorMessages.forThrowable(t))
+        } finally {
+            temp.delete()
+            lateCopy?.delete()
+        }
+    }
+
+    private fun notifyFinished(results: List<FileResult>) {
+        val context = applicationContext
+        val ok = results.filter { it.ok }
+        when {
+            results.size == 1 && ok.size == 1 -> with(ok.first()) {
+                Notifications.done(context, outputName!!, "${formatSize(inputSize)} → ${formatSize(outputSize)}", outputUri!!, mimeType)
+            }
+            results.size == 1 -> Notifications.failed(context, results.first().inputName, results.first().error ?: "")
+            else -> Notifications.batchDone(
+                context, ok.size, results.size,
+                "${formatSize(ok.sumOf { it.inputSize })} → ${formatSize(ok.sumOf { it.outputSize })}",
+            )
         }
     }
 
@@ -126,16 +184,16 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
         ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
     }
 
-    private fun progressNotification(name: String, status: Status) = Notifications.progress(
+    private fun progressNotification(s: Status) = Notifications.progress(
         applicationContext,
-        title = name,
-        text = if (status.phase == PHASE_COPY) "Datei wird vorbereitet … ${status.progress} %" else "${status.progress} %",
-        progress = status.progress,
+        title = if (s.count > 1) "Datei ${s.index + 1} von ${s.count}: ${s.name}" else s.name,
+        text = if (s.phase == PHASE_COPY) "Datei wird vorbereitet … ${s.progress} %" else "${s.overall} %",
+        progress = s.overall,
         cancel = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id),
     )
 
-    private fun foregroundInfo(name: String, status: Status): ForegroundInfo {
-        val notification = progressNotification(name, status)
+    private fun foregroundInfo(s: Status): ForegroundInfo {
+        val notification = progressNotification(s)
         return when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM ->
                 ForegroundInfo(Notifications.ID_PROGRESS, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
@@ -146,28 +204,21 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
     }
 
     companion object {
-        const val KEY_INPUT_URI = "inputUri"
-        const val KEY_INPUT_NAME = "inputName"
-        const val KEY_INPUT_SIZE = "inputSize"
-        const val KEY_DURATION = "duration"
-        const val KEY_PROGRESS = "progress"
+        const val KEY_JOB_ID = "jobId"
+        const val KEY_INDEX = "index"
+        const val KEY_COUNT = "count"
+        const val KEY_NAME = "name"
         const val KEY_PHASE = "phase"
-        const val KEY_OUTPUT_URI = "outputUri"
-        const val KEY_OUTPUT_NAME = "outputName"
-        const val KEY_OUTPUT_SIZE = "outputSize"
-        const val KEY_OUTPUT_MIME = "outputMime"
+        const val KEY_PROGRESS = "progress"
+        const val KEY_OVERALL = "overall"
         const val KEY_ERROR = "error"
 
         const val PHASE_COPY = "copy"
         const val PHASE_CONVERT = "convert"
 
-        fun inputData(file: InputFile, settings: ConversionSettings): Data =
-            Data.Builder()
-                .putAll(settings.toData())
-                .putString(KEY_INPUT_URI, file.uri.toString())
-                .putString(KEY_INPUT_NAME, file.name)
-                .putLong(KEY_INPUT_SIZE, file.size)
-                .putLong(KEY_DURATION, file.durationMs ?: 0L)
-                .build()
+        /** So viel Platz bleibt beim Vorab-Kopieren mindestens frei. */
+        private const val RESERVE_BYTES = 500L * 1024 * 1024
+
+        fun inputData(jobId: UUID): Data = workDataOf(KEY_JOB_ID to jobId.toString())
     }
 }

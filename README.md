@@ -13,6 +13,8 @@ Offline-Medienkonverter für Android. Keine Werbung, keine Cloud, keine Anmeldun
 
 \* HEIC ab Android 9, AVIF ab Android 12, sofern das Gerät es dekodiert.
 
+**Mehrere Dateien:** bis zu 100 auf einmal auswählen oder teilen, z. B. 50 HEIC-Fotos → JPG. Schlägt eine Datei fehl, laufen die anderen weiter.
+
 **Dateien öffnen:** in der App über die Galerie (Photo Picker) oder „Datei suchen“ (Systemdateiauswahl, auch für Musik), oder von außen über **Teilen an** / **Öffnen mit**.
 
 **Vorgaben:** Für WhatsApp · Für E-Mail (< 25 MB) · Kleinste Datei · Max. Qualität. Unter „Erweitert“ gibt es Auflösung, Zielgröße, Bitrate und Qualität.
@@ -29,6 +31,13 @@ Benötigt JDK 17 und das Android SDK (Plattform 35).
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`
 
+Tests:
+
+```bash
+./gradlew testDebugUnitTest          # Unit-Tests
+./gradlew connectedDebugAndroidTest  # Ende-zu-Ende auf angeschlossenem Gerät
+```
+
 ## Struktur
 
 ```
@@ -43,6 +52,6 @@ app/src/main/java/com/simpleconverter/app/
 
 ## Fahrplan
 
-- **v0.2:** Stapelverarbeitung (mehrere Dateien teilen), FFmpeg für MP3/FLAC/OGG/WebM-Ausgabe
+- **v0.2:** ~~Stapelverarbeitung~~ ✅, FFmpeg für MP3/FLAC/OGG/WebM-Ausgabe
 - **v0.3:** Kürzen mit Vorschau, Lautstärke angleichen, Widget
 - **v1.0:** F-Droid und Play Store, Open Source

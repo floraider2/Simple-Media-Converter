@@ -101,6 +101,20 @@ class SettingsAndPresetsTest {
     }
 
     @Test
+    fun `gemeinsame Zielformate eines Stapels`() {
+        val video = OutputFormat.targetsFor(MediaKind.VIDEO)
+        val silentVideo = OutputFormat.targetsFor(MediaKind.VIDEO, hasAudio = false)
+        val audio = OutputFormat.targetsFor(MediaKind.AUDIO)
+        val image = OutputFormat.targetsFor(MediaKind.IMAGE)
+        assertEquals(listOf(OutputFormat.MP4), silentVideo)
+        assertEquals(video, OutputFormat.intersect(listOf(video, video)))
+        assertEquals(listOf(OutputFormat.M4A, OutputFormat.WAV), OutputFormat.intersect(listOf(video, audio)))
+        assertEquals(listOf(OutputFormat.MP4), OutputFormat.intersect(listOf(video, silentVideo)))
+        assertEquals(emptyList<OutputFormat>(), OutputFormat.intersect(listOf(image, audio)))
+        assertEquals(emptyList<OutputFormat>(), OutputFormat.intersect(emptyList()))
+    }
+
+    @Test
     fun `jeder Medientyp hat mindestens ein Zielformat`() {
         MediaKind.entries.forEach { assertTrue(OutputFormat.targetsFor(it).isNotEmpty()) }
     }
