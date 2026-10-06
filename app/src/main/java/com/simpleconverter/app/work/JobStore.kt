@@ -59,6 +59,7 @@ object JobStore {
             .put("outputFolder", st.outputFolder ?: "")
             .put("trimStartMs", st.trimStartMs ?: -1L)
             .put("trimEndMs", st.trimEndMs ?: -1L)
+            .put("normalizeLoudness", st.normalizeLoudness)
         write(file(context, job.id, ""), JSONObject().put("files", files).put("settings", settings))
     }
 
@@ -92,6 +93,7 @@ object JobStore {
             outputFolder = s.optString("outputFolder").takeIf { it.isNotEmpty() },
             trimStartMs = s.optLong("trimStartMs", -1L).takeIf { it >= 0 },
             trimEndMs = s.optLong("trimEndMs", -1L).takeIf { it >= 0 },
+            normalizeLoudness = s.optBoolean("normalizeLoudness", false),
         )
         Job(id, files, settings)
     }.getOrNull()

@@ -18,11 +18,13 @@ import com.simpleconverter.app.convert.InputCache
 import com.simpleconverter.app.convert.OutputStore
 import com.simpleconverter.app.convert.VideoConverter
 import com.simpleconverter.app.convert.audio.AudioConverter
+import com.simpleconverter.app.convert.audio.Loudness
 import com.simpleconverter.app.data.RecentStore
 import com.simpleconverter.app.data.formatSize
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.InputFile
+import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
 import com.simpleconverter.app.model.RecentItem
 import com.simpleconverter.app.model.outputFileName
@@ -141,11 +143,16 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 else -> file.uri
             }
             onProgress(0)
+            // Lautstärke angleichen: erster Durchgang misst (0–40 %), zweiter wandelt um (40–100 %).
+            val withAudio = settings.format.kind == MediaKind.AUDIO || (file.hasAudio && !settings.removeAudio)
+            val normalize = settings.normalizeLoudness && withAudio && settings.format.kind != MediaKind.IMAGE
+            val gainDb = if (normalize) Loudness.measureGainDb(context, input, settings) { onProgress(it * 40 / 100) } else 0.0
+            val convertProgress: (Int) -> Unit = if (normalize) { p -> onProgress(40 + p * 60 / 100) } else onProgress
             when (settings.format) {
                 OutputFormat.MP4, OutputFormat.WEBM, OutputFormat.M4A ->
-                    VideoConverter.convert(context, input, temp, settings, file.durationMs, onProgress)
+                    VideoConverter.convert(context, input, temp, settings, file.durationMs, convertProgress, gainDb)
                 OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV ->
-                    AudioConverter.convert(context, input, temp, settings, onProgress)
+                    AudioConverter.convert(context, input, temp, settings, convertProgress, gainDb)
                 OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP ->
                     ImageConverter.convert(context, input, temp, settings)
             }

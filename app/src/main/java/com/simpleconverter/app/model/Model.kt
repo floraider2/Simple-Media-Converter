@@ -79,6 +79,8 @@ data class ConversionSettings(
     /** Kürzen (Video/Audio): Anfang und Ende in ms; null = vom Anfang bzw. bis zum Ende. */
     val trimStartMs: Long? = null,
     val trimEndMs: Long? = null,
+    /** Lautstärke auf −14 LUFS angleichen (zwei Durchgänge: messen, dann umwandeln). */
+    val normalizeLoudness: Boolean = false,
 ) {
     val isTrimmed get() = trimStartMs != null || trimEndMs != null
 
@@ -92,7 +94,12 @@ data class ConversionSettings(
 
     /** Was der Nutzer unabhängig von der Vorgabe gewählt hat, auf andere Einstellungen übertragen. */
     fun withUserChoicesFrom(other: ConversionSettings) =
-        copy(keepMetadata = other.keepMetadata, trimStartMs = other.trimStartMs, trimEndMs = other.trimEndMs)
+        copy(
+            keepMetadata = other.keepMetadata,
+            trimStartMs = other.trimStartMs,
+            trimEndMs = other.trimEndMs,
+            normalizeLoudness = other.normalizeLoudness,
+        )
 
     fun toData(): Data = workDataOf(
         "format" to format.name,
@@ -108,6 +115,7 @@ data class ConversionSettings(
         "outputFolder" to outputFolder,
         "trimStartMs" to (trimStartMs ?: -1L),
         "trimEndMs" to (trimEndMs ?: -1L),
+        "normalizeLoudness" to normalizeLoudness,
     )
 
     companion object {
@@ -125,6 +133,7 @@ data class ConversionSettings(
             outputFolder = d.getString("outputFolder"),
             trimStartMs = d.getLong("trimStartMs", -1L).takeIf { it >= 0 },
             trimEndMs = d.getLong("trimEndMs", -1L).takeIf { it >= 0 },
+            normalizeLoudness = d.getBoolean("normalizeLoudness", false),
         )
     }
 }

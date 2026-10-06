@@ -404,7 +404,7 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
     }
 }
 
-private fun hasAdvanced(format: OutputFormat) = format != OutputFormat.WAV && format != OutputFormat.FLAC
+private fun hasAdvanced(format: OutputFormat) = true
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -447,15 +447,24 @@ private fun AdvancedOptions(
                 }
                 if (allHaveAudio) {
                     SwitchRow(stringResource(R.string.adv_remove_audio), null, settings.removeAudio) { c -> update { it.copy(removeAudio = c) } }
-                    if (!settings.removeAudio) AudioBitrateChips(settings, update)
+                    if (!settings.removeAudio) {
+                        AudioBitrateChips(settings, update)
+                        LoudnessSwitch(settings, update)
+                    }
                 }
             }
-            OutputFormat.M4A, OutputFormat.MP3 -> AudioBitrateChips(settings, update)
-            OutputFormat.OPUS -> ChipGroup(
-                stringResource(R.string.adv_audio_bitrate),
-                listOf(32_000 to "32k", 64_000 to "64k", 96_000 to "96k", 128_000 to "128k", 192_000 to "192k"),
-                settings.audioBitrate,
-            ) { v -> if (v != null) update { it.copy(audioBitrate = v) } }
+            OutputFormat.M4A, OutputFormat.MP3 -> {
+                AudioBitrateChips(settings, update)
+                LoudnessSwitch(settings, update)
+            }
+            OutputFormat.OPUS -> {
+                ChipGroup(
+                    stringResource(R.string.adv_audio_bitrate),
+                    listOf(32_000 to "32k", 64_000 to "64k", 96_000 to "96k", 128_000 to "128k", 192_000 to "192k"),
+                    settings.audioBitrate,
+                ) { v -> if (v != null) update { it.copy(audioBitrate = v) } }
+                LoudnessSwitch(settings, update)
+            }
             OutputFormat.JPG, OutputFormat.WEBP, OutputFormat.PNG -> {
                 ChipGroup(
                     stringResource(R.string.adv_max_size),
@@ -476,9 +485,18 @@ private fun AdvancedOptions(
                     )
                 }
             }
-            OutputFormat.WAV, OutputFormat.FLAC -> Unit
+            OutputFormat.WAV, OutputFormat.FLAC -> LoudnessSwitch(settings, update)
         }
     }
+}
+
+@Composable
+private fun LoudnessSwitch(settings: ConversionSettings, update: ((ConversionSettings) -> ConversionSettings) -> Unit) {
+    SwitchRow(
+        stringResource(R.string.adv_normalize),
+        stringResource(R.string.adv_normalize_hint),
+        settings.normalizeLoudness,
+    ) { c -> update { it.copy(normalizeLoudness = c) } }
 }
 
 /** Ganze Zeile antippbar, nicht nur der Schalter. */

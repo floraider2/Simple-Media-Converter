@@ -21,6 +21,8 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
+import com.simpleconverter.app.convert.audio.GainAudioProcessor
+import com.simpleconverter.app.convert.audio.Loudness
 import com.simpleconverter.app.model.Bitrate
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.OutputFormat
@@ -50,12 +52,15 @@ object VideoConverter {
         settings: ConversionSettings,
         durationMs: Long?,
         onProgress: (Int) -> Unit,
+        gainDb: Double = 0.0,
     ) {
         val audioOnly = settings.format == OutputFormat.M4A
         val removeAudio = !audioOnly && settings.removeAudio
 
         val probe = probe(context, input)
-        val effects = if (audioOnly) Effects.EMPTY else videoEffects(probe, settings.videoShortSide)
+        val videoOnly = if (audioOnly) Effects.EMPTY else videoEffects(probe, settings.videoShortSide)
+        val effects = if (gainDb == 0.0 || removeAudio) videoOnly
+        else Effects(listOf(GainAudioProcessor(Loudness.linear(gainDb))), videoOnly.videoEffects)
         val mediaItem = MediaItem.Builder()
             .setUri(input)
             .apply {

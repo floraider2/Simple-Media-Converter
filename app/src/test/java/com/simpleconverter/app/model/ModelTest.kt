@@ -84,6 +84,7 @@ class SettingsAndPresetsTest {
             outputFolder = "content://com.android.externalstorage.documents/tree/primary%3AMusic",
             trimStartMs = 1_500,
             trimEndMs = 9_000,
+            normalizeLoudness = true,
         )
         assertEquals(settings, ConversionSettings.fromData(settings.toData()))
     }
