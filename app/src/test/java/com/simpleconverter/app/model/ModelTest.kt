@@ -82,8 +82,33 @@ class SettingsAndPresetsTest {
             hevc = true,
             keepMetadata = true,
             outputFolder = "content://com.android.externalstorage.documents/tree/primary%3AMusic",
+            trimStartMs = 1_500,
+            trimEndMs = 9_000,
         )
         assertEquals(settings, ConversionSettings.fromData(settings.toData()))
+    }
+
+    @Test
+    fun `gekuerzte Laenge`() {
+        val full = 60_000L
+        assertEquals(full, ConversionSettings(OutputFormat.MP3).trimmedDurationMs(full))
+        assertEquals(50_000L, ConversionSettings(OutputFormat.MP3, trimStartMs = 10_000).trimmedDurationMs(full))
+        assertEquals(20_000L, ConversionSettings(OutputFormat.MP3, trimEndMs = 20_000).trimmedDurationMs(full))
+        assertEquals(15_000L, ConversionSettings(OutputFormat.MP3, trimStartMs = 5_000, trimEndMs = 20_000).trimmedDurationMs(full))
+        // Ende hinter der Datei wird auf die volle Länge begrenzt
+        assertEquals(10_000L, ConversionSettings(OutputFormat.MP3, trimStartMs = 50_000, trimEndMs = 90_000).trimmedDurationMs(full))
+        assertEquals(null, ConversionSettings(OutputFormat.MP3).trimmedDurationMs(null))
+    }
+
+    @Test
+    fun `Vorgabe wechseln behaelt Ausschnitt und Kameradaten`() {
+        val mine = ConversionSettings(OutputFormat.MP3, trimStartMs = 1_000, trimEndMs = 2_000, keepMetadata = true)
+        val preset = ConversionSettings(OutputFormat.MP3, audioBitrate = 320_000)
+        val merged = preset.withUserChoicesFrom(mine)
+        assertEquals(320_000, merged.audioBitrate)
+        assertEquals(1_000L, merged.trimStartMs)
+        assertEquals(2_000L, merged.trimEndMs)
+        assertTrue(merged.keepMetadata)
     }
 
     @Test

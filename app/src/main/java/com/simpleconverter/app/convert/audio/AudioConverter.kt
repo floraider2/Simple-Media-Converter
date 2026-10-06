@@ -24,7 +24,11 @@ object AudioConverter {
         settings: ConversionSettings,
         onProgress: (Int) -> Unit,
     ) = withContext(Dispatchers.IO) {
-        PcmDecoder.decode(context, input, sinkFor(output, settings), onProgress)
+        PcmDecoder.decode(
+            context, input, sinkFor(output, settings), onProgress,
+            startUs = (settings.trimStartMs ?: 0L) * 1000,
+            endUs = settings.trimEndMs?.let { it * 1000 },
+        )
     }
 
     private fun sinkFor(output: File, settings: ConversionSettings): PcmSink = when (settings.format) {

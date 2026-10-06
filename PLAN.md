@@ -2,7 +2,7 @@
 
 Stand: 06.10.2026 · Neueste Version: **v0.3.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.3.0 veröffentlicht (Sprachen, Einstellungen, Speicherort). Als Nächstes v0.4 – noch nicht begonnen.
+**Aktueller Schwerpunkt:** v0.4 – Kürzen ✅, als Nächstes Lautstärke angleichen.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -219,7 +219,7 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 
 ### v0.4 – Komfort (aus v0.3 verschoben)
 
-- [ ] **Kürzen mit Vorschau**: ExoPlayer-Vorschau + Bereichs-Schieberegler, Umsetzung über `MediaItem.ClippingConfiguration` (Video) bzw. Bereich im `PcmDecoder` (Audio)
+- [x] **Kürzen mit Vorschau** (einzelne Video-/Audiodatei): ExoPlayer-Vorschau, Bereichs-Schieberegler (vom System-Zurückwischen ausgenommen), „Anfang hier“/„Ende hier“ an der Abspielstelle. Video über `MediaItem.ClippingConfiguration`, Audio schneidet der `PcmDecoder` sample-genau zu; Zielgröße rechnet mit der gekürzten Länge
 - [ ] **Lautstärke angleichen** (EBU R128, Ziel −14 / −16 LUFS) – ohne FFmpeg: eigene Messung im PCM-Weg
 - [ ] **Verlauf** auf Room umstellen, Suche/Filter im Verlauf, einzelne Einträge löschen
 - [ ] Vorschaubilder (Thumbnails) in Setup und Verlauf
@@ -337,6 +337,15 @@ Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Enco
 | Standardordner Audio in den Einstellungen | ✅ wird beim Öffnen angezeigt und genutzt; „Standard“ setzt zurück |
 | „Öffnen“ einer Datei im eigenen Ordner | ✅ App-Auswahl erscheint |
 | „Über die App“, Link zum Quellcode | ✅ |
+
+**v0.4 Kürzen (06.10.2026)** – Unit-Tests 24, Geräte-Tests 6/6
+
+| Test | Ergebnis |
+|---|---|
+| 10 min WAV → MP3, Bereich ca. 10–80 % | ✅ 6:59 |
+| Video, Ende bei 50 % / Anfang bei 30 % (10 s) | ✅ 4,75 s / 6,74 s (Testvideo hat nur ~2 Bilder/s) |
+| Griff vom Bildschirmrand ziehen | Fehler: löste die Zurück-Geste aus → Regler vom Gestenbereich ausgenommen ✅ |
+| Vorschau springt beim Ziehen mit, „Zurücksetzen“ | ✅ |
 
 **Gefunden und behoben**
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.

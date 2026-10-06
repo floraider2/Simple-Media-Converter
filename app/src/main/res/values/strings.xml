@@ -202,4 +202,12 @@
     <string name="folder_default_suffix">%s (default)</string>
     <string name="folder_change">Change</string>
     <string name="folder_reset">Default</string>
+
+    <!-- Kürzen -->
+    <string name="trim_title">Trim</string>
+    <string name="trim_full">Whole file</string>
+    <string name="trim_range">%1$s – %2$s (%3$s)</string>
+    <string name="trim_set_start">Start here</string>
+    <string name="trim_set_end">End here</string>
+    <string name="trim_reset">Reset</string>
 </resources>

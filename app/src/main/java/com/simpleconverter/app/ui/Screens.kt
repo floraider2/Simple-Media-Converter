@@ -285,6 +285,11 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
     ) {
         val first = s.files.first()
         if (s.files.size == 1) FileHeader(first) else BatchHeader(s.files, vm::removeFile)
+        // Kürzen nur bei einer einzelnen Video- oder Audiodatei mit bekannter Länge.
+        val single = s.files.singleOrNull()
+        if (single != null && single.kind != MediaKind.IMAGE && single.durationMs != null) {
+            TrimSection(single, s.settings, vm::setTrim)
+        }
         if (s.files.any { it.kind == MediaKind.VIDEO && !it.hasAudio }) {
             Text(
                 stringResource(if (s.files.size == 1) R.string.setup_no_audio_single else R.string.setup_no_audio_batch),
