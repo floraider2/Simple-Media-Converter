@@ -131,6 +131,7 @@
     <string name="err_image_unsupported">Your device can’t read this image format.</string>
     <string name="err_unexpected">Unexpected error (%s). Try other settings.</string>
     <string name="err_cannot_read_format">Your device can’t read this format.</string>
+    <string name="err_cannot_open_file">The file cannot be opened. It is damaged or in a format your device does not know.</string>
     <string name="err_cannot_encode">Your device can’t save with these settings. Try a lower resolution.</string>
     <string name="err_cannot_write_output">The output file couldn’t be written.</string>
     <string name="err_export_failed">Conversion failed (%s).</string>

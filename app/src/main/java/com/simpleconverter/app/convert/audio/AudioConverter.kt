@@ -12,8 +12,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Tonspur → WAV, FLAC, Opus oder MP3. Dekodiert wird immer mit MediaCodec,
- * kodiert je nach Ziel mit dem System-Encoder (FLAC, Opus) oder LAME (MP3).
+ * Tonspur → WAV, FLAC, Opus, M4A (AAC) oder MP3. Dekodiert wird immer mit MediaCodec,
+ * kodiert je nach Ziel mit dem System-Encoder (FLAC, Opus, AAC) oder LAME (MP3).
+ * „Original-Ton“ (M4A ohne Neu-Kodieren) läuft dagegen über Media3, siehe VideoConverter.
  */
 object AudioConverter {
 
@@ -40,6 +41,12 @@ object AudioConverter {
         OutputFormat.WAV -> WavSink(output)
         OutputFormat.FLAC -> FlacSink(output)
         OutputFormat.MP3 -> StereoDownmix(Mp3Sink(output, settings.audioBitrate))
+        OutputFormat.M4A -> StereoDownmix(
+            Resampler(
+                targetRate = { rate -> if (rate in AacSink.SAMPLE_RATES) rate else 48_000 },
+                next = AacSink(output, settings.audioBitrate),
+            )
+        )
         OutputFormat.OPUS -> {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 throw ConversionException(R.string.err_opus_needs_android10)

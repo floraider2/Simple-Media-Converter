@@ -6,8 +6,10 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
 import androidx.media3.transformer.AudioEncoderSettings
@@ -18,11 +20,13 @@ import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.InAppMp4Muxer
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.simpleconverter.app.convert.audio.GainAudioProcessor
 import com.simpleconverter.app.convert.audio.Loudness
+import com.simpleconverter.app.data.FileInspector
 import com.simpleconverter.app.model.Bitrate
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.OutputFormat
@@ -42,7 +46,7 @@ import kotlinx.coroutines.withContext
  * HDR-Videos (z. B. von neueren Handys) werden immer nach SDR umgerechnet: Sonst wirken sie
  * auf vielen Geräten und in Messengern blass oder falsch.
  */
-@OptIn(UnstableApi::class)
+@OptIn(UnstableApi::class, ExperimentalApi::class)
 object VideoConverter {
 
     suspend fun convert(
@@ -101,7 +105,13 @@ object VideoConverter {
             .setRemoveAudio(removeAudio)
             .setEffects(effects)
             .build()
-        val composition = Composition.Builder(EditedMediaItemSequence(edited))
+        // Welche Spuren die Ausgabe hat, muss Media3 vorab wissen.
+        val tracks = FileInspector.trackMimes(context, input)
+        val trackTypes = buildSet {
+            if (!audioOnly && (tracks == null || tracks.video != null)) add(C.TRACK_TYPE_VIDEO)
+            if (!removeAudio && (tracks == null || tracks.audio != null)) add(C.TRACK_TYPE_AUDIO)
+        }
+        val composition = Composition.Builder(EditedMediaItemSequence.Builder(trackTypes).addItem(edited).build())
             .apply {
                 if (copy) {
                     // Spuren nur umpacken, nicht dekodieren/kodieren.
@@ -123,14 +133,15 @@ object VideoConverter {
         // Zielgröße bezieht sich auf die gekürzte Länge.
         val videoBitrate = (targetVideoBitrate(settings, settings.trimmedDurationMs(durationMs), removeAudio) ?: settings.videoBitrate)
             ?.let { Bitrate.capToSource(it, probe?.bitrate) }
+        // Beim Kopieren keine Encoder-Wünsche angeben: Media3 (ab 1.6) kodiert sonst trotz Transmux neu.
         val encoderFactory = DefaultEncoderFactory.Builder(context.applicationContext)
             .setEnableFallback(true)
-            .setRequestedAudioEncoderSettings(
-                AudioEncoderSettings.Builder().setBitrate(settings.audioBitrate).build()
-            )
             .apply {
-                if (videoBitrate != null) {
-                    setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(videoBitrate).build())
+                if (!copy) {
+                    setRequestedAudioEncoderSettings(AudioEncoderSettings.Builder().setBitrate(settings.audioBitrate).build())
+                    if (videoBitrate != null) {
+                        setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(videoBitrate).build())
+                    }
                 }
             }
             .build()
@@ -150,8 +161,13 @@ object VideoConverter {
                     }
                 }
                 transformer = Transformer.Builder(context.applicationContext)
-                    .setVideoMimeType(videoMime)
-                    .setAudioMimeType(if (webm) MimeTypes.AUDIO_OPUS else MimeTypes.AUDIO_AAC)
+                    .apply {
+                        // Beim Kopieren die Formate der Quelle behalten.
+                        if (!copy) {
+                            setVideoMimeType(videoMime)
+                            setAudioMimeType(if (webm) MimeTypes.AUDIO_OPUS else MimeTypes.AUDIO_AAC)
+                        }
+                    }
                     .setEncoderFactory(encoderFactory)
                     // Beim Kopieren mit Kürzen nur den Anfang bis zum nächsten Schlüsselbild neu kodieren.
                     .experimentalSetTrimOptimizationEnabled(copy && settings.isTrimmed)
@@ -160,6 +176,9 @@ object VideoConverter {
                             setMuxerFactory(WebmMuxer.Factory())
                             // WebM kann keine Drehung speichern → Hochkant-Videos hochkant kodieren.
                             setPortraitEncodingEnabled(true)
+                        } else if (audioOnly) {
+                            // Ohne Platzhalter für „schnellen Start“ – bei reinem Ton wären das sonst ~1/3 der Datei.
+                            setMuxerFactory(InAppMp4Muxer.Factory().setAttemptStreamableOutputEnabled(false))
                         }
                     }
                     .addListener(object : Transformer.Listener {

@@ -2,6 +2,7 @@ package com.simpleconverter.app.work
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.content.edit
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.InputFile
@@ -142,7 +143,7 @@ object JobStore {
     // ───────────── Aktiver Auftrag (für die UI) ─────────────
 
     fun setActive(context: Context, id: UUID?) {
-        prefs(context).edit().apply { if (id == null) remove("id") else putString("id", id.toString()) }.apply()
+        prefs(context).edit { if (id == null) remove("id") else putString("id", id.toString()) }
     }
 
     fun active(context: Context): UUID? =

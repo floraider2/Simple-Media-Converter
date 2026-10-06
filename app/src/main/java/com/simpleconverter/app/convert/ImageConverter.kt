@@ -9,6 +9,8 @@ import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.simpleconverter.app.R
 import com.simpleconverter.app.model.ConversionSettings
@@ -113,18 +115,16 @@ object ImageConverter {
         }
         if (maxSide != null && max(bitmap.width, bitmap.height) > maxSide) {
             val scale = maxSide.toDouble() / max(bitmap.width, bitmap.height)
-            bitmap = Bitmap.createScaledBitmap(
-                bitmap,
+            bitmap = bitmap.scale(
                 (bitmap.width * scale).roundToInt().coerceAtLeast(1),
                 (bitmap.height * scale).roundToInt().coerceAtLeast(1),
-                true,
             )
         }
         return bitmap
     }
 
     private fun flattenOnWhite(src: Bitmap): Bitmap {
-        val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+        val out = createBitmap(src.width, src.height)
         Canvas(out).apply {
             drawColor(Color.WHITE)
             drawBitmap(src, 0f, 0f, null)

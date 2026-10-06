@@ -2,7 +2,6 @@ package com.simpleconverter.app.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,6 +28,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.simpleconverter.app.BuildConfig
 import com.simpleconverter.app.R
@@ -130,7 +130,7 @@ fun SettingsScreen(vm: ConverterViewModel, modifier: Modifier) {
             modifier = Modifier
                 .clickable {
                     try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL)))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, SOURCE_URL.toUri()))
                     } catch (e: ActivityNotFoundException) {
                         // Kein Browser installiert – nichts zu tun.
                     }

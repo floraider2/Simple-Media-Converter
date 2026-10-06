@@ -1,8 +1,8 @@
 # Simple Converter – Projektplan
 
-Stand: 06.10.2026 · Neueste Version: **v0.5.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
+Stand: 06.10.2026 · Neueste Version: **v0.6.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.5.0 (Geschwindigkeit) veröffentlicht. Als Nächstes v0.6: Bibliotheken aktualisieren, Baseline Profile. Widget und Schnell-Kachel: später / vielleicht.
+**Aktueller Schwerpunkt:** v0.6.0 (alles aktualisiert, schnellerer Start) veröffentlicht. Widget und Schnell-Kachel: später / vielleicht.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -238,11 +238,17 @@ Gemessen auf Galaxy S24 Ultra (Android 16) mit `PerfTest` und nicht-debuggbarem 
 - [x] **Kleinere APK:** kein 32-Bit-x86 mehr
 - [x] **FLAC:** eigener FLAC-Leser (`FlacSource`, prüft jede Frame-Grenze per CRC-8, Nummer und CRC-16), weil die Leser von Android und Media3 1.5 manche Dateien falsch zerlegen; FLAC-Dateien der App tragen jetzt Frame-Größen und MD5 im Kopf
 
-### v0.6 – Wartung (geplant)
+### v0.6 – Alles aktualisiert ✅ (Release v0.6.0)
 
-- [ ] **Alles aktualisieren:** alle Bibliotheken und Build-Werkzeuge auf den neuesten Stand (Media3, Compose, AndroidX, Android Gradle Plugin, Kotlin, Gradle, NDK/CMake, compileSdk/targetSdk), vollständiger Testlauf
-- [ ] Baseline Profile (Macrobenchmark-Modul) für schnelleren App-Start
-- [ ] Prüfen, ob neuere Media3-Versionen den FLAC-Fehler am Dateiende behoben haben
+- [x] **Alles aktualisiert:** Gradle 9.8, Android Gradle Plugin 9.4 (Kotlin jetzt eingebaut), Kotlin 2.4, compileSdk/targetSdk 37 (Android 17), NDK 30, CMake 4.1, Media3 1.11, Compose-BOM 2026.09, AndroidX (Core, Activity, Lifecycle, WorkManager, ExifInterface, Test)
+  - Media3: Muxer-API (Track-Nummern statt `TrackToken`), `EditedMediaItemSequence.Builder` mit Spurtypen, `MediaExtractorCompat` jetzt in `media3-inspector`; Material-Symbole als eigene Abhängigkeit
+  - Lint der neuen Version: KTX-Funktionen, Backup-Regeln (`dataExtractionRules`: nichts in die Cloud, nichts aufs neue Gerät), Speicherplatz über `StorageManager.getAllocatableBytes`
+- [x] **Baseline Profile** (Modul `baselineprofile`, Macrobenchmark): Kaltstart 260 → 221 ms (Median, S24 Ultra). Mess-Varianten heißen `com.simpleconverter.app.benchmark`, damit die installierte App unberührt bleibt
+- [x] **M4A über den eigenen Audio-Weg** (`AacSink`, MediaCodec + MediaMuxer, parallel): Media3 1.11 brauchte 5,2 s für 1 min Ton, jetzt 0,6 s. Dabei behoben: Bis v0.5 wurde bei „Nur Ton: M4A“ die gewählte Bitrate ignoriert und nur kopiert
+- [x] „Original behalten“/„Original-Ton“: Media3 1.11 kodiert trotz Transmux neu, wenn Encoder-Wünsche gesetzt sind → beim Kopieren keine setzen; reines M4A ohne Platzhalter für schnellen Start (sonst ~⅓ größer)
+- [x] Verständliche Meldung für kaputte Dateien statt „Unerwarteter Fehler (IOException)“
+- [x] Geräte-Tests räumen ihre Ergebnisse in Music/Pictures/Movies selbst wieder weg
+- FLAC liest weiterhin der eigene Leser (`FlacSource`), unabhängig von Media3
 
 ### Später / vielleicht
 
@@ -416,6 +422,24 @@ Galaxy S24 Ultra, `PerfTest` mit `-Pperf` (nicht debuggbar), beide Versionen gle
 **Gefunden und behoben**
 - FLAC-Dateien wurden beim Wiedereinlesen um 0,1–0,3 s zu kurz (schon in v0.4: 599,83 s statt 600 s). Ursache: Der FLAC-Encoder lässt Frame-Größen und MD5 im Dateikopf leer, und die Leser von Android und Media3 zerlegen solche (und manche andere) Dateien falsch → Kopf wird vervollständigt, eigener FLAC-Leser.
 - Dekodieren und Kodieren auf einem Thread dauerten zusammen doppelt so lange wie einzeln → `PipelineSink`.
+
+**v0.6 Alles aktualisiert (06.10.2026)** – Unit-Tests 42, Geräte-Tests 6/6, Lint ohne Befund
+
+| Messung (S24 Ultra, `-Pperf`) | v0.5 | v0.6 |
+|---|---|---|
+| App-Kaltstart (Median aus 10) | 260 ms | 221 ms |
+| Video 60 s → Nur Ton M4A (192 kbit/s) | 0,9 s (kopiert, Bitrate ignoriert) | 0,6 s (wirklich neu kodiert) |
+| 10 min WAV → M4A | – | 5,3 s |
+| Video 60 s → „Original-Ton“ | 0,9 s | 0,7 s |
+| Video 60 s gekürzt, „Original behalten“ | 2,0 s | 2,1 s |
+| 10 min M4A → MP3 + Lautstärke | 14,8 s | 14,8 s |
+| 10 min WAV → Opus / FLAC / MP3 | 9,0 / 3,8 / 12,1 s | 9,3 / 3,7 / 12,3 s |
+
+| Test (minifizierter Release-Build als `.releasetest`) | Ergebnis |
+|---|---|
+| WAV → MP3, M4A, FLAC; Video → MP4, WebM, „Original behalten“, „Original-Ton“, Nur Ton M4A; PNG → JPG | ✅ 9/9 |
+| „Original-Ton“ Dateigröße | 1,38 MB (Platzhalter) → 994 KB nach Korrektur ✅ |
+| Kaputte Datei im Stapel | ✅ neue Meldung, die anderen laufen weiter |
 
 ### Manuelle Testmatrix
 

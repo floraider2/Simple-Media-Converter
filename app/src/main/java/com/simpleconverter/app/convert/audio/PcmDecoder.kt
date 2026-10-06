@@ -77,7 +77,9 @@ object PcmDecoder {
             AudioSource.open(context, input)
         } catch (e: Exception) {
             sink.release()
-            throw e
+            // Nicht erreichbare Dateien meldet ErrorMessages selbst; alles andere ist kaputt oder unbekannt.
+            if (e is SecurityException || e is java.io.FileNotFoundException) throw e
+            throw ConversionException(R.string.err_cannot_open_file)
         }
         try {
             val track = (0 until extractor.trackCount).firstOrNull {

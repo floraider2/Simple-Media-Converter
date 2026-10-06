@@ -70,7 +70,7 @@ class PerfTest {
 
     @Test
     fun audio(): Unit = runBlocking {
-        for (format in listOf(OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV)) {
+        for (format in listOf(OutputFormat.MP3, OutputFormat.M4A, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV)) {
             val settings = Presets.forFormat(format).first().settings
             val file = out(format)
             measure("Audio 10 min WAV → ${format.name}") {
@@ -122,9 +122,10 @@ class PerfTest {
     fun video(): Unit = runBlocking {
         val file = FileInspector.inspect(context, video60)!!
         val m4a = Presets.forFormat(OutputFormat.M4A).first().settings
-        measure("Video 60 s → Nur Ton M4A") {
-            VideoConverter.convert(context, video60, out(OutputFormat.M4A), m4a, file.durationMs, {})
-        }
+        // Wie in der App: neu kodiertes M4A über den Audio-Weg, „Original-Ton“ über Media3.
+        val m4aOut = out(OutputFormat.M4A)
+        measure("Video 60 s → Nur Ton M4A") { AudioConverter.convert(context, video60, m4aOut, m4a, {}) }
+        verifyLength(m4aOut, 60.0)
         val max = Presets.forFormat(OutputFormat.MP4).first { it.id == "max" }.settings
         measure("Video 60 s → MP4 gekürzt 10–40 s (Max. Qualität)") {
             VideoConverter.convert(context, video60, out(OutputFormat.MP4), max.copy(trimStartMs = 10_000, trimEndMs = 40_000), file.durationMs, {})
@@ -140,7 +141,6 @@ class PerfTest {
                 VideoConverter.convert(context, video60, out(OutputFormat.M4A), copy.settings, file.durationMs, {})
             }
         }
-        Unit
     }
 
     @Test
@@ -228,7 +228,6 @@ class PerfTest {
             m4a10 = uri(m4aFile)
             video60 = uri(videoWithAac("video60.mp4", seconds = 60))
             images = (1..24).map { uri(png("bild_$it.png", it)) }
-            Unit
         }
 
         @JvmStatic
@@ -287,7 +286,7 @@ class PerfTest {
                 MediaItem.Builder().setUri(uri(png)).setImageDurationMs(seconds * 1000L).build()
             ).setFrameRate(30).build()
             val sound = EditedMediaItem.Builder(MediaItem.fromUri(uri(audio))).build()
-            val composition = Composition.Builder(EditedMediaItemSequence(image), EditedMediaItemSequence(sound)).build()
+            val composition = Composition.Builder(EditedMediaItemSequence.withVideoFrom(listOf(image)), EditedMediaItemSequence.withAudioFrom(listOf(sound))).build()
             val file = File(dir, name)
             suspendCancellableCoroutine { cont ->
                 Handler(Looper.getMainLooper()).post {

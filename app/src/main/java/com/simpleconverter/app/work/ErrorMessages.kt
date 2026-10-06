@@ -22,7 +22,7 @@ object ErrorMessages {
         (chain.firstOrNull { it is ConversionException } as ConversionException?)?.let {
             return context.getString(it.messageRes, *it.args)
         }
-        chain.firstOrNull { it is ExportException }?.let { return context.getString(forExport(it as ExportException), (it as ExportException).errorCodeName) }
+        (chain.firstOrNull { it is ExportException } as ExportException?)?.let { return context.getString(forExport(it), it.errorCodeName) }
 
         if (chain.any { it is OutOfMemoryError }) {
             return context.getString(R.string.err_out_of_memory)

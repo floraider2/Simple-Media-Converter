@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "SimpleConverter"
 include(":app")
+include(":baselineprofile")

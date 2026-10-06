@@ -21,7 +21,7 @@ That's all. If you have ideas, feel free to [open an issue](https://github.com/f
 | 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264 or H.265 + AAC): resolution, bitrate, target size, remove audio; HDR is converted to SDR. “Keep original”: trim or remove audio without re-encoding | Media3 Transformer (hardware) |
 | 🎬 Video | WebM (VP9 + Opus, Android 10+) | Media3 Transformer + MediaMuxer |
 | 🎬 Video / 🎵 Audio | MP3 (32–320 kbit/s) | LAME 3.100 (native, in this repo) |
-| 🎬 Video / 🎵 Audio | M4A (AAC); “Original audio” copies an AAC track without re-encoding | Media3 Transformer |
+| 🎬 Video / 🎵 Audio | M4A (AAC); “Original audio” copies an AAC track without re-encoding | MediaCodec + MediaMuxer; copying: Media3 Transformer |
 | 🎬 Video / 🎵 Audio | Opus in OGG (Android 10+) | MediaCodec + MediaMuxer |
 | 🎬 Video / 🎵 Audio | FLAC (lossless) | MediaCodec, own FLAC reader |
 | 🎬 Video / 🎵 Audio | WAV (16-bit PCM) | MediaCodec |
@@ -45,7 +45,7 @@ Requires Android 8 or newer.
 
 ## Building
 
-Needs JDK 17 and the Android SDK (platform 35) with NDK 27.2 and CMake 3.22.1 (for LAME).
+Needs JDK 17 and the Android SDK (platform 37) with NDK 30 and CMake 4.1.2 (for LAME).
 
 ```bash
 ./gradlew assembleDebug
@@ -56,7 +56,10 @@ The APK in `app/build/outputs/apk/debug/` installs as **“Simple Converter Debu
 ```bash
 ./gradlew testDebugUnitTest          # unit tests
 ./gradlew connectedDebugAndroidTest  # end-to-end tests on a connected device
+./gradlew :app:generateReleaseBaselineProfile  # record the startup profile (device with Android 13+)
 ```
+
+Profile and startup measurements install a separate `com.simpleconverter.app.benchmark`, so an installed version is never replaced.
 
 How releases are built and signed: [RELEASING.md](RELEASING.md).
 
@@ -68,10 +71,11 @@ app/src/main/java/com/simpleconverter/app/
 ├── model/Model.kt           formats, settings, presets
 ├── data/                    file info, history, app settings
 ├── convert/                 video and image converters, saving
-│   └── audio/               decoder → WAV/FLAC/Opus/MP3, downmix, resampling
+│   └── audio/               decoder → WAV/FLAC/Opus/MP3/M4A, own FLAC reader, downmix, resampling
 ├── work/ConversionWorker.kt background work + notifications
 └── ui/                      ViewModel, screens, theme
 app/src/main/cpp/            JNI bridge + LAME source
+baselineprofile/             records the Baseline Profile, measures app start
 ```
 
 ## Translations
@@ -85,7 +89,7 @@ Translations are welcome: copy `app/src/main/res/values/strings.xml` to `values-
 - **v0.3** ✅ English + German, settings, save location
 - **v0.4** ✅ Trim with preview, loudness normalization (−14 LUFS), history with search, thumbnails, accessibility
 - **v0.5** ✅ Speed: “Keep original” without re-encoding, much faster audio, parallel image batches, smaller APK
-- **v0.6** Update everything: all libraries and build tools (Media3, Compose, Android Gradle Plugin, Kotlin, Gradle) to the latest versions, plus faster app start (Baseline Profile)
+- **v0.6** ✅ Everything updated (Android 17 SDK, Media3, Compose, Kotlin, Gradle), faster app start (Baseline Profile), much faster M4A
 - **Maybe:** F-Droid and Play Store – not decided yet
 
 Details: [PLAN.md](PLAN.md) (German).

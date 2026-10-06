@@ -9,7 +9,9 @@ import androidx.media3.common.Metadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.MediaFormatUtil
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.muxer.BufferInfo
 import androidx.media3.muxer.Muxer
+import androidx.media3.muxer.MuxerException
 import com.google.common.collect.ImmutableList
 import java.nio.ByteBuffer
 
@@ -33,33 +35,35 @@ class WebmMuxer private constructor(path: String) : Muxer {
         }
     }
 
-    private class Track(val index: Int) : Muxer.TrackToken
-
     private val muxer = try {
         MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM)
     } catch (e: Exception) {
-        throw Muxer.MuxerException("Could not create WebM file", e)
+        throw MuxerException("Could not create WebM file", e)
     }
     private var started = false
 
-    override fun addTrack(format: Format): Muxer.TrackToken {
-        if (started) throw Muxer.MuxerException("Track added after start", IllegalStateException())
+    override fun addTrack(format: Format): Int {
+        if (started) throw MuxerException("Track added after start", IllegalStateException())
         return try {
-            Track(muxer.addTrack(MediaFormatUtil.createMediaFormatFromFormat(format)))
+            muxer.addTrack(MediaFormatUtil.createMediaFormatFromFormat(format))
         } catch (e: Exception) {
-            throw Muxer.MuxerException("Track ${format.sampleMimeType} is not supported in WebM", e)
+            throw MuxerException("Track ${format.sampleMimeType} is not supported in WebM", e)
         }
     }
 
-    override fun writeSampleData(trackToken: Muxer.TrackToken, data: ByteBuffer, bufferInfo: MediaCodec.BufferInfo) {
+    private val info = MediaCodec.BufferInfo()
+
+    override fun writeSampleData(trackId: Int, data: ByteBuffer, bufferInfo: BufferInfo) {
         try {
             if (!started) {
                 muxer.start()
                 started = true
             }
-            muxer.writeSampleData((trackToken as Track).index, data, bufferInfo)
+            // Media3-Flags (C.BUFFER_FLAG_*) haben dieselben Werte wie die von MediaCodec.
+            info.set(data.position(), bufferInfo.size, bufferInfo.presentationTimeUs, bufferInfo.flags)
+            muxer.writeSampleData(trackId, data, info)
         } catch (e: Exception) {
-            throw Muxer.MuxerException("Writing WebM sample failed", e)
+            throw MuxerException("Writing WebM sample failed", e)
         }
     }
 
@@ -70,7 +74,7 @@ class WebmMuxer private constructor(path: String) : Muxer {
         try {
             if (started) muxer.stop()
         } catch (e: Exception) {
-            throw Muxer.MuxerException("Could not finish WebM file", e)
+            throw MuxerException("Could not finish WebM file", e)
         } finally {
             muxer.release()
         }
