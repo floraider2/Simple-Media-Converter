@@ -14,8 +14,8 @@ android {
         applicationId = "com.simpleconverter.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -47,8 +47,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Eigener Paketname: Entwicklerversion und installierte Release-Version laufen nebeneinander.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "Simple Converter Debug")
+        }
         release {
             signingConfig = signingConfigs.findByName("release")
+            resValue("string", "app_name", "Simple Converter")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -70,6 +77,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
 }
 
@@ -86,6 +94,7 @@ dependencies {
     implementation(libs.androidx.media3.transformer)
     implementation(libs.androidx.media3.effect)
     implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.muxer)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.exifinterface)
     debugImplementation(libs.androidx.compose.ui.tooling)

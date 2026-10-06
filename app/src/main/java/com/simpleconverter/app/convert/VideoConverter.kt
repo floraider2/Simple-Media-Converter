@@ -14,6 +14,7 @@ import androidx.media3.transformer.AudioEncoderSettings
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
@@ -33,8 +34,11 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Video → MP4 (H.264/AAC) und Video/Audio → M4A (AAC) über Media3 Transformer.
- * Nutzt die Hardware-Encoder des Geräts.
+ * Video → MP4 (H.264 oder H.265 + AAC), Video → WebM (VP9 + Opus) und Video/Audio → M4A (AAC)
+ * über Media3 Transformer. Nutzt die Hardware-Encoder des Geräts.
+ *
+ * HDR-Videos (z. B. von neueren Handys) werden immer nach SDR umgerechnet: Sonst wirken sie
+ * auf vielen Geräten und in Messengern blass oder falsch.
  */
 @OptIn(UnstableApi::class)
 object VideoConverter {
@@ -57,6 +61,15 @@ object VideoConverter {
             .setRemoveAudio(removeAudio)
             .setEffects(effects)
             .build()
+        val composition = Composition.Builder(EditedMediaItemSequence(edited))
+            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+            .build()
+        val webm = settings.format == OutputFormat.WEBM
+        val videoMime = when {
+            webm -> MimeTypes.VIDEO_VP9
+            settings.hevc -> MimeTypes.VIDEO_H265
+            else -> MimeTypes.VIDEO_H264
+        }
 
         // Nie mehr Bitrate als das Original – sonst wird die Datei beim „Verkleinern“ größer.
         val videoBitrate = (targetVideoBitrate(settings, durationMs, removeAudio) ?: settings.videoBitrate)
@@ -88,9 +101,16 @@ object VideoConverter {
                     }
                 }
                 transformer = Transformer.Builder(context.applicationContext)
-                    .setVideoMimeType(MimeTypes.VIDEO_H264)
-                    .setAudioMimeType(MimeTypes.AUDIO_AAC)
+                    .setVideoMimeType(videoMime)
+                    .setAudioMimeType(if (webm) MimeTypes.AUDIO_OPUS else MimeTypes.AUDIO_AAC)
                     .setEncoderFactory(encoderFactory)
+                    .apply {
+                        if (webm) {
+                            setMuxerFactory(WebmMuxer.Factory())
+                            // WebM kann keine Drehung speichern → Hochkant-Videos hochkant kodieren.
+                            setPortraitEncodingEnabled(true)
+                        }
+                    }
                     .addListener(object : Transformer.Listener {
                         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                             handler.removeCallbacks(poll)
@@ -108,7 +128,7 @@ object VideoConverter {
                     })
                     .build()
 
-                transformer.start(edited, output.absolutePath)
+                transformer.start(composition, output.absolutePath)
                 handler.post(poll)
                 cont.invokeOnCancellation {
                     handler.post {

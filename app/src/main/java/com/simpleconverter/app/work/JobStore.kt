@@ -54,6 +54,8 @@ object JobStore {
             .put("audioBitrate", st.audioBitrate)
             .put("imageMaxSide", st.imageMaxSide ?: 0)
             .put("imageQuality", st.imageQuality)
+            .put("hevc", st.hevc)
+            .put("keepMetadata", st.keepMetadata)
         write(file(context, job.id, ""), JSONObject().put("files", files).put("settings", settings))
     }
 
@@ -82,6 +84,8 @@ object JobStore {
             audioBitrate = s.getInt("audioBitrate"),
             imageMaxSide = s.getInt("imageMaxSide").takeIf { it > 0 },
             imageQuality = s.getInt("imageQuality"),
+            hevc = s.optBoolean("hevc", false),
+            keepMetadata = s.optBoolean("keepMetadata", false),
         )
         Job(id, files, settings)
     }.getOrNull()

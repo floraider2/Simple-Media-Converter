@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -76,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.simpleconverter.app.data.formatDuration
 import com.simpleconverter.app.data.formatSize
+import com.simpleconverter.app.convert.Encoders
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.commonTargets
@@ -131,7 +133,7 @@ fun ConverterApp(vm: ConverterViewModel) {
             Screen.Home -> HomeScreen(recents, loading, vm::openFiles, vm::clearRecents, modifier)
             is Screen.Setup -> SetupScreen(s, vm, modifier)
             is Screen.Working -> WorkingScreen(s, vm::cancelConversion, modifier)
-            is Screen.Done -> DoneScreen(s, vm::goHome, vm::backToSetup, modifier)
+            is Screen.Done -> DoneScreen(s, vm, modifier)
             is Screen.Failed -> FailedScreen(s, vm::backToSetup, vm::goHome, modifier)
         }
     }
@@ -350,7 +352,8 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
 
         if (first.kind == MediaKind.IMAGE) {
             Text(
-                "🔒 Standort, Kameradaten und andere EXIF-Infos werden beim Umwandeln entfernt.",
+                if (s.settings.keepMetadata) "🔒 Der Standort wird entfernt, Kameradaten bleiben erhalten."
+                else "🔒 Standort, Kameradaten und andere EXIF-Infos werden beim Umwandeln entfernt.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -383,7 +386,14 @@ private fun AdvancedOptions(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (format) {
-            OutputFormat.MP4 -> {
+            OutputFormat.MP4, OutputFormat.WEBM -> {
+                if (format == OutputFormat.MP4 && Encoders.hevc) {
+                    ChipGroup(
+                        "Codec",
+                        listOf(false to "H.264 (überall)", true to "H.265 (kleiner)"),
+                        settings.hevc,
+                    ) { v -> update { it.copy(hevc = v ?: false) } }
+                }
                 ChipGroup(
                     "Auflösung",
                     listOf(null to "Original", 1080 to "1080p", 720 to "720p", 480 to "480p"),
@@ -405,10 +415,7 @@ private fun AdvancedOptions(
                     ) { v -> update { it.copy(videoBitrate = v) } }
                 }
                 if (allHaveAudio) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Ton entfernen", modifier = Modifier.weight(1f))
-                        Switch(checked = settings.removeAudio, onCheckedChange = { c -> update { it.copy(removeAudio = c) } })
-                    }
+                    SwitchRow("Ton entfernen", null, settings.removeAudio) { c -> update { it.copy(removeAudio = c) } }
                     if (!settings.removeAudio) AudioBitrateChips(settings, update)
                 }
             }
@@ -424,6 +431,11 @@ private fun AdvancedOptions(
                     listOf(null to "Original", 3840 to "3840 px", 1920 to "1920 px", 1600 to "1600 px", 1280 to "1280 px"),
                     settings.imageMaxSide,
                 ) { v -> update { it.copy(imageMaxSide = v) } }
+                SwitchRow(
+                    "Kameradaten behalten",
+                    "Aufnahmezeit, Kamera, Belichtung – der Standort wird trotzdem entfernt",
+                    settings.keepMetadata,
+                ) { c -> update { it.copy(keepMetadata = c) } }
                 if (format != OutputFormat.PNG) {
                     Text("Qualität: ${settings.imageQuality}", style = MaterialTheme.typography.labelLarge)
                     Slider(
@@ -435,6 +447,26 @@ private fun AdvancedOptions(
             }
             OutputFormat.WAV, OutputFormat.FLAC -> Unit
         }
+    }
+}
+
+/** Ganze Zeile antippbar, nicht nur der Schalter. */
+@Composable
+private fun SwitchRow(title: String, subtitle: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -564,18 +596,21 @@ private fun WorkingScreen(s: Screen.Working, onCancel: () -> Unit, modifier: Mod
 }
 
 @Composable
-private fun DoneScreen(s: Screen.Done, onAnother: () -> Unit, onRetry: () -> Unit, modifier: Modifier) {
+private fun DoneScreen(s: Screen.Done, vm: ConverterViewModel, modifier: Modifier) {
     val single = s.results.singleOrNull()
     when {
-        single != null && single.ok -> SingleDone(single, onAnother, modifier)
-        single != null -> FailedScreen(Screen.Failed(s.files, single.error ?: ""), onRetry, onAnother, modifier)
-        else -> BatchDone(s.results, onAnother, modifier)
+        single != null && single.ok -> SingleDone(single, vm::goHome, { vm.saveCopy(single, it) }, modifier)
+        single != null -> FailedScreen(Screen.Failed(s.files, single.error ?: ""), vm::backToSetup, vm::goHome, modifier)
+        else -> BatchDone(s.results, vm::goHome, { vm.saveAllTo(s.results, it) }, modifier)
     }
 }
 
 @Composable
-private fun SingleDone(r: FileResult, onAnother: () -> Unit, modifier: Modifier) {
+private fun SingleDone(r: FileResult, onAnother: () -> Unit, onSaveAs: (Uri) -> Unit, modifier: Modifier) {
     val context = LocalContext.current
+    val saveAs = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(r.mimeType)) { uri ->
+        uri?.let(onSaveAs)
+    }
     Column(
         modifier.padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
@@ -601,13 +636,17 @@ private fun SingleDone(r: FileResult, onAnother: () -> Unit, modifier: Modifier)
             }
             FilledTonalButton(onClick = { openOutput(context, r.outputUri!!, r.mimeType) }) { Text("Öffnen") }
         }
+        OutlinedButton(onClick = { saveAs.launch(r.outputName ?: "umgewandelt") }) { Text("Speichern unter …") }
         TextButton(onClick = onAnother) { Text("Noch eine Datei") }
     }
 }
 
 @Composable
-private fun BatchDone(results: List<FileResult>, onAnother: () -> Unit, modifier: Modifier) {
+private fun BatchDone(results: List<FileResult>, onAnother: () -> Unit, onSaveAll: (Uri) -> Unit, modifier: Modifier) {
     val context = LocalContext.current
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let(onSaveAll)
+    }
     val ok = results.filter { it.ok }
     val allOk = ok.size == results.size
     LazyColumn(
@@ -642,6 +681,7 @@ private fun BatchDone(results: List<FileResult>, onAnother: () -> Unit, modifier
                         Spacer(Modifier.size(8.dp))
                         Text("Alle teilen")
                     }
+                    OutlinedButton(onClick = { pickFolder.launch(null) }) { Text("Alle in Ordner speichern …") }
                 }
                 TextButton(onClick = onAnother) { Text("Noch eine Datei") }
             }

@@ -15,6 +15,7 @@ enum class OutputFormat(
     val minSdk: Int = 26,
 ) {
     MP4("MP4", "mp4", "video/mp4", MediaKind.VIDEO),
+    WEBM("WebM", "webm", "video/webm", MediaKind.VIDEO, minSdk = 29),
     MP3("MP3", "mp3", "audio/mpeg", MediaKind.AUDIO),
     M4A("M4A (AAC)", "m4a", "audio/mp4", MediaKind.AUDIO),
     OPUS("Opus", "ogg", "audio/ogg", MediaKind.AUDIO, minSdk = 29),
@@ -27,7 +28,7 @@ enum class OutputFormat(
     companion object {
         /** Zielformate für einen Medientyp; ohne Tonspur gibt es keine Audio-Ziele. */
         fun targetsFor(kind: MediaKind, hasAudio: Boolean = true, sdkInt: Int = Int.MAX_VALUE): List<OutputFormat> = when (kind) {
-            MediaKind.VIDEO -> listOf(MP4, MP3, M4A, OPUS, FLAC, WAV)
+            MediaKind.VIDEO -> listOf(MP4, WEBM, MP3, M4A, OPUS, FLAC, WAV)
             MediaKind.AUDIO -> listOf(MP3, M4A, OPUS, FLAC, WAV)
             MediaKind.IMAGE -> listOf(JPG, PNG, WEBP)
         }.filter { (hasAudio || it.kind != MediaKind.AUDIO) && sdkInt >= it.minSdk }
@@ -67,6 +68,10 @@ data class ConversionSettings(
     val imageMaxSide: Int? = null,
     /** Bild: Qualität 1–100 (JPG/WebP). */
     val imageQuality: Int = 90,
+    /** Video (MP4): H.265 statt H.264 – kleiner, aber nicht überall abspielbar. */
+    val hevc: Boolean = false,
+    /** Bild: Kameradaten und Aufnahmezeit behalten (Standort wird immer entfernt). */
+    val keepMetadata: Boolean = false,
 ) {
     fun toData(): Data = workDataOf(
         "format" to format.name,
@@ -77,6 +82,8 @@ data class ConversionSettings(
         "audioBitrate" to audioBitrate,
         "imageMaxSide" to (imageMaxSide ?: 0),
         "imageQuality" to imageQuality,
+        "hevc" to hevc,
+        "keepMetadata" to keepMetadata,
     )
 
     companion object {
@@ -89,6 +96,8 @@ data class ConversionSettings(
             audioBitrate = d.getInt("audioBitrate", 192_000),
             imageMaxSide = d.getInt("imageMaxSide", 0).takeIf { it > 0 },
             imageQuality = d.getInt("imageQuality", 90),
+            hevc = d.getBoolean("hevc", false),
+            keepMetadata = d.getBoolean("keepMetadata", false),
         )
     }
 }
@@ -109,6 +118,14 @@ object Presets {
                 ConversionSettings(format, videoShortSide = 480, videoBitrate = 700_000, audioBitrate = 96_000)),
             Preset("max", "Max. Qualität", "Originalauflösung",
                 ConversionSettings(format, videoBitrate = 12_000_000, audioBitrate = 192_000)),
+        )
+        OutputFormat.WEBM -> listOf(
+            Preset("standard", "Standard", "720p, VP9 – gut fürs Web",
+                ConversionSettings(format, videoShortSide = 720, videoBitrate = 1_500_000, audioBitrate = 96_000)),
+            Preset("smallest", "Kleinste Datei", "480p, niedrige Bitrate",
+                ConversionSettings(format, videoShortSide = 480, videoBitrate = 500_000, audioBitrate = 64_000)),
+            Preset("max", "Max. Qualität", "Originalauflösung",
+                ConversionSettings(format, videoBitrate = 8_000_000, audioBitrate = 128_000)),
         )
         OutputFormat.MP3 -> listOf(
             Preset("standard", "Standard", "192 kbit/s, passt überall",

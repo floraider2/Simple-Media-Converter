@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests + 4 Geräte-Tests grün, Lint sauber, getestet auf Galaxy S24 Ultra / Android 16)
 
-**Aktueller Schwerpunkt:** v0.2 – Stapelverarbeitung und MP3/Opus/FLAC sind fertig. Offen: WebM-Video, H.265, HDR.
+**Aktueller Schwerpunkt:** v0.2 ist fertig (Release v0.2.0). Als Nächstes: v0.3.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -90,9 +90,9 @@ Ein Medienkonverter für Android, der **komplett offline** läuft:
 | L3 | ✅ Keine „Fertig“-Benachrichtigung | Wer die App verlässt, merkt das Ende nicht | Abschluss-Benachrichtigung mit „Teilen/Öffnen“ (v0.1.1) |
 | L4 | ✅ UI verliert laufenden Job nach Prozess-Tod | Fortschrittsbildschirm fehlt nach Neustart | Laufende Arbeit per WorkManager-Tag beim Start wieder aufnehmen (v0.1.1) |
 | L5 | ✅ Hochkant-Videos + Skalierung ungetestet (geprüft: 1080×2340 → 720×1560, richtig gedreht) | evtl. Balken oder falsche Ausrichtung | Testvideo hochkant 1080×1920 prüfen (v0.1.1) |
-| L6 | HDR-Videos (HDR10/HLG) | evtl. blasse Farben oder Fehler | Media3 `HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL` setzen (v0.2) |
+| L6 | ✅ HDR-Videos (HDR10/HLG) | evtl. blasse Farben oder Fehler | Media3 `HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL` setzen (v0.2) |
 | L7 | Texte fest im Kotlin-Code | keine Übersetzung möglich | Nach `strings.xml` verschieben (v0.3) |
-| L8 | Android 8/9: Ergebnis nur im App-Ordner | nicht in der Galerie sichtbar | „Speichern unter …“ per `CreateDocument` anbieten (v0.2) |
+| L8 | ✅ Android 8/9: Ergebnis nur im App-Ordner („Speichern unter …“) | nicht in der Galerie sichtbar | „Speichern unter …“ per `CreateDocument` anbieten (v0.2) |
 | L9 | ✅ MP3/FLAC/Opus erledigt (ohne FFmpeg, siehe 5.1) · WebM/MKV als **Ausgabe** fehlen noch | Android hat dafür keine Encoder | FFmpeg (v0.2) |
 | L10 | ~~Git-Commit fehlgeschlagen~~ | – | erledigt |
 
@@ -183,7 +183,7 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 - [x] 16-KB-Seiten für Android 15+ (`ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES`)
 
 **Noch offen (früher unter „FFmpeg-Engine“)**
-- [ ] WebM (VP9 + Opus) – Kandidat: MediaCodec-VP9 + MediaMuxer WEBM, ohne FFmpeg
+- [x] WebM (VP9 + Opus) über Media3 Transformer mit eigenem `WebmMuxer` (MediaMuxer WEBM); Hochkant-Videos werden hochkant kodiert, weil WebM keine Drehung speichert
 - [ ] MKV – nur falls wirklich gefragt
 
 <details><summary>Ursprünglicher FFmpeg-Plan (zurückgestellt)</summary>
@@ -205,10 +205,11 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 </details>
 
 **Weitere Punkte**
-- [ ] H.265-Option unter „Erweitert“ (nur anzeigen, wenn Encoder vorhanden)
-- [ ] HDR → SDR Tone-Mapping (L6)
-- [ ] „Speichern unter …“ als zusätzliche Option (L8)
-- [ ] Option „EXIF behalten“ (Kopieren über `ExifInterface`, ohne GPS optional)
+- [x] H.265-Option unter „Erweitert“ (nur anzeigen, wenn Encoder vorhanden)
+- [x] HDR → SDR Tone-Mapping (L6) – immer, für beste Kompatibilität
+- [x] „Speichern unter …“ als zusätzliche Option (L8), bei Stapeln „Alle in Ordner speichern …“
+- [x] Option „Kameradaten behalten“ (Kopieren über `ExifInterface`, GPS wird nie kopiert)
+- [x] Debug-Build mit eigenem Paketnamen (`.debug`), läuft neben der installierten Release-Version
 
 ### v0.3 – Komfort (3 Wochen)
 
@@ -306,6 +307,17 @@ Gefunden: Bei Bild-Stapeln lag „Umwandeln“ unter dem Bildschirmrand → Knop
 | 10 min WAV (110 MB) → MP3 / Opus / FLAC | 13 s / 25 s / 11 s | 13,7 MB / 10,0 MB / 10,7 MB |
 
 Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Encoder-Schleife beim Füttern jedes Mal 10 ms auf Ausgabe wartete → jetzt ohne Warten, 12–20× schneller.
+
+**Video-Optionen & Bilder (06.10.2026)**
+
+| Test | Ergebnis |
+|---|---|
+| Video hochkant → WebM Standard / Klein | ✅ VP9, hochkant 612×1326 / 480×1040 (VP9-Encoder weicht bei 720×1560 auf kleinere Größe aus) |
+| Video → MP4 mit H.265 | ✅ `hvc1` im Container |
+| Video → MP4 (neuer Composition-Weg mit HDR-Umrechnung) | ✅ unverändert |
+| `ImageMetadataTest`: Standard entfernt Kamera + GPS; „Kameradaten behalten“ übernimmt Kamera/Zeit, nie GPS | ✅ 2/2 |
+| „Speichern unter …“ | Knopf vorhanden; Dateiauswahl nicht automatisiert (zeigt private Ordner) |
+| WebM **mit Ton** (Opus-Spur), HDR-Quelle | ⏳ kein passendes Testvideo |
 
 **Gefunden und behoben**
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.
