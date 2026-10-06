@@ -10,7 +10,7 @@ import org.json.JSONObject
 object RecentStore {
     private const val PREFS = "recent"
     private const val KEY = "items"
-    private const val MAX_ITEMS = 20
+    private const val MAX_ITEMS = 200
 
     @Synchronized
     fun load(context: Context): List<RecentItem> {
@@ -34,7 +34,10 @@ object RecentStore {
 
     @Synchronized
     fun add(context: Context, item: RecentItem) {
-        val items = (listOf(item) + load(context)).take(MAX_ITEMS)
+        save(context, (listOf(item) + load(context)).take(MAX_ITEMS))
+    }
+
+    private fun save(context: Context, items: List<RecentItem>) {
         val array = JSONArray()
         items.forEach {
             array.put(
@@ -49,6 +52,11 @@ object RecentStore {
             )
         }
         prefs(context).edit().putString(KEY, array.toString()).apply()
+    }
+
+    @Synchronized
+    fun remove(context: Context, timestamp: Long) {
+        save(context, load(context).filterNot { it.timestamp == timestamp })
     }
 
     @Synchronized

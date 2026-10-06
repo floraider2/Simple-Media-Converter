@@ -17,6 +17,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiScrollable
+import androidx.test.uiautomator.UiSelector
 import androidx.test.uiautomator.Until
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -113,6 +115,10 @@ class ImageMetadataTest {
     }
 
     private fun click(text: String) {
+        // Liegt der Text unterhalb des sichtbaren Bereichs, erst dorthin scrollen.
+        if (device.wait(Until.findObject(By.text(text)), 3_000) == null) {
+            runCatching { UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView(text) }
+        }
         val node = device.wait(Until.findObject(By.text(text)), 10_000)
         assertNotNull("„$text“ nicht gefunden", node)
         node.click()

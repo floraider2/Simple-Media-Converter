@@ -274,3 +274,20 @@ data class FileResult(
 ) {
     val ok get() = outputUri != null
 }
+
+/** Medientyp anhand des MIME-Typs (für Verlauf und Vorschaubilder). */
+fun kindOfMime(mime: String): MediaKind = when {
+    mime.startsWith("video/") -> MediaKind.VIDEO
+    mime.startsWith("audio/") -> MediaKind.AUDIO
+    else -> MediaKind.IMAGE
+}
+
+/**
+ * Passt ein Verlaufseintrag zur Suche? [query] wird in Ziel- und Quellname gesucht
+ * (Groß-/Kleinschreibung egal, mehrere Wörter müssen alle vorkommen); [kind] null = alle Typen.
+ */
+fun matchesHistory(outputName: String, inputName: String, mime: String, query: String, kind: MediaKind?): Boolean {
+    if (kind != null && kindOfMime(mime) != kind) return false
+    val haystack = "$outputName $inputName".lowercase()
+    return query.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }.all { it in haystack }
+}

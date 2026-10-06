@@ -213,4 +213,19 @@
     <!-- Lautstärke -->
     <string name="adv_normalize">Lautstärke angleichen</string>
     <string name="adv_normalize_hint">So laut wie bei Streaming-Diensten (−14 LUFS), ohne Übersteuern. Dauert etwas länger.</string>
+
+    <!-- Verlauf -->
+    <string name="history_title">Verlauf</string>
+    <string name="history_show_all">Alle anzeigen (%d)</string>
+    <string name="history_search">Nach Namen suchen</string>
+    <string name="history_clear_search">Suche leeren</string>
+    <string name="history_all">Alle</string>
+    <string name="history_empty">Noch nichts umgewandelt.</string>
+    <string name="history_no_match">Keine passenden Einträge.</string>
+    <string name="history_more">Weitere Optionen für %s</string>
+    <string name="history_remove">Aus Verlauf entfernen</string>
+
+    <string name="settings_thumbnails">Vorschaubilder anzeigen</string>
+    <string name="settings_thumbnails_hint">Vorschau im Verlauf und beim Umwandeln. Aus: nur Symbole.</string>
+    <string name="history_just_now">gerade eben</string>
 </resources>

@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
@@ -20,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.simpleconverter.app.data.ThemeMode
 import com.simpleconverter.app.ui.ConverterApp
 import com.simpleconverter.app.ui.ConverterViewModel
+import com.simpleconverter.app.ui.LocalShowThumbnails
 import com.simpleconverter.app.ui.theme.SimpleConverterTheme
 
 class MainActivity : ComponentActivity() {
@@ -49,7 +51,9 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
             SimpleConverterTheme(settings.theme) {
-                ConverterApp(vm)
+                CompositionLocalProvider(LocalShowThumbnails provides settings.showThumbnails) {
+                    ConverterApp(vm)
+                }
             }
         }
     }
