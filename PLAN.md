@@ -2,7 +2,7 @@
 
 Stand: 06.10.2026 · Neueste Version: **v0.3.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.4 – Kürzen ✅, als Nächstes Lautstärke angleichen.
+**Aktueller Schwerpunkt:** v0.4 – Kürzen ✅, Lautstärke ✅, als Nächstes Verlauf mit Suche.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -220,7 +220,7 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 ### v0.4 – Komfort (aus v0.3 verschoben)
 
 - [x] **Kürzen mit Vorschau** (einzelne Video-/Audiodatei): ExoPlayer-Vorschau, Bereichs-Schieberegler (vom System-Zurückwischen ausgenommen), „Anfang hier“/„Ende hier“ an der Abspielstelle. Video über `MediaItem.ClippingConfiguration`, Audio schneidet der `PcmDecoder` sample-genau zu; Zielgröße rechnet mit der gekürzten Länge
-- [ ] **Lautstärke angleichen** (EBU R128, Ziel −14 / −16 LUFS) – ohne FFmpeg: eigene Messung im PCM-Weg
+- [x] **Lautstärke angleichen** auf −14 LUFS (EBU R128 / BS.1770, eigener Messer ohne FFmpeg), Spitzen max. −1 dBFS; zwei Durchgänge (messen 0–40 %, umwandeln 40–100 %); für alle Audioformate und die Tonspur von Videos
 - [ ] **Verlauf** auf Room umstellen, Suche/Filter im Verlauf, einzelne Einträge löschen
 - [ ] Vorschaubilder (Thumbnails) in Setup und Verlauf
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
@@ -346,6 +346,13 @@ Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Enco
 | Video, Ende bei 50 % / Anfang bei 30 % (10 s) | ✅ 4,75 s / 6,74 s (Testvideo hat nur ~2 Bilder/s) |
 | Griff vom Bildschirmrand ziehen | Fehler: löste die Zurück-Geste aus → Regler vom Gestenbereich ausgenommen ✅ |
 | Vorschau springt beim Ziehen mit, „Zurücksetzen“ | ✅ |
+
+**v0.4 Lautstärke (06.10.2026)** – Unit-Tests 34 (inkl. Referenzwerte aus BS.1770: 997-Hz-Sinus 0 dBFS = −3,01 LUFS mono / 0 LUFS stereo), Geräte-Tests 6/6
+
+| Test (Messung am PC mit unabhängigem BS.1770-Skript) | Ergebnis |
+|---|---|
+| Leise Datei (−30 LUFS) → WAV angeglichen | ✅ −14,00 LUFS |
+| Testton (−9,33 LUFS) → M4A angeglichen → zurück nach WAV | ✅ −14,02 LUFS (Media3-Weg, gilt auch für Video-Tonspur) |
 
 **Gefunden und behoben**
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.

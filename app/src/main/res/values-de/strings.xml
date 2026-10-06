@@ -209,4 +209,8 @@
     <string name="trim_set_start">Anfang hier</string>
     <string name="trim_set_end">Ende hier</string>
     <string name="trim_reset">Zurücksetzen</string>
+
+    <!-- Lautstärke -->
+    <string name="adv_normalize">Lautstärke angleichen</string>
+    <string name="adv_normalize_hint">So laut wie bei Streaming-Diensten (−14 LUFS), ohne Übersteuern. Dauert etwas länger.</string>
 </resources>

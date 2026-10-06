@@ -23,9 +23,11 @@ object AudioConverter {
         output: File,
         settings: ConversionSettings,
         onProgress: (Int) -> Unit,
+        gainDb: Double = 0.0,
     ) = withContext(Dispatchers.IO) {
+        val sink = sinkFor(output, settings).let { if (gainDb == 0.0) it else GainSink(it, Loudness.linear(gainDb)) }
         PcmDecoder.decode(
-            context, input, sinkFor(output, settings), onProgress,
+            context, input, sink, onProgress,
             startUs = (settings.trimStartMs ?: 0L) * 1000,
             endUs = settings.trimEndMs?.let { it * 1000 },
         )

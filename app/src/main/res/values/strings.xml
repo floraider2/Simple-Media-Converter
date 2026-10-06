@@ -210,4 +210,8 @@
     <string name="trim_set_start">Start here</string>
     <string name="trim_set_end">End here</string>
     <string name="trim_reset">Reset</string>
+
+    <!-- Lautstärke -->
+    <string name="adv_normalize">Normalize loudness</string>
+    <string name="adv_normalize_hint">As loud as streaming services (−14 LUFS), without clipping. Takes a little longer.</string>
 </resources>
