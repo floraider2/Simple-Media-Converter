@@ -1,6 +1,6 @@
 # Simple Converter – Projektplan
 
-Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests + 4 Geräte-Tests grün, Lint sauber, getestet auf Galaxy S24 Ultra / Android 16)
+Stand: 06.10.2026 · Neueste Version: **v0.3.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
 **Aktueller Schwerpunkt:** v0.3.0 veröffentlicht (Sprachen, Einstellungen, Speicherort). Als Nächstes v0.4 – noch nicht begonnen.
 
