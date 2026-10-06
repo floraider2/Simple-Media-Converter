@@ -14,12 +14,16 @@ android {
         applicationId = "com.simpleconverter.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Leistungsmessungen (@LargeTest) laufen nur gezielt, nicht bei jedem Testlauf:
+        // ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.simpleconverter.app.PerfTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.FlakyTest
+        testInstrumentationRunnerArguments["notAnnotation"] = "androidx.test.filters.LargeTest"
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            // Kein 32-Bit-x86 (nur alte Emulatoren). x86_64 bleibt für Chromebooks und x86-Tablets.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
         externalNativeBuild {
             cmake {
@@ -50,6 +54,9 @@ android {
         debug {
             // Eigener Paketname: Entwicklerversion und installierte Release-Version laufen nebeneinander.
             applicationIdSuffix = ".debug"
+            // Für Leistungsmessungen (./gradlew … -Pperf): ohne Debug-Kennzeichen, sonst bremst Android
+            // eigenen Kotlin-Code stark aus und die Zahlen sagen nichts über die echte App.
+            isDebuggable = !project.hasProperty("perf")
             versionNameSuffix = "-debug"
             resValue("string", "app_name", "Simple Converter Debug")
         }

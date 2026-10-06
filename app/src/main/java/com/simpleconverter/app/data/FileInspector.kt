@@ -43,25 +43,29 @@ object FileInspector {
         if (size < 0) {
             size = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } }.getOrNull() ?: 0L
         }
-        val meta = if (kind == MediaKind.IMAGE) null else readMeta(context, uri)
+        val duration = if (kind == MediaKind.IMAGE) null else readDuration(context, uri)
+        val tracks = if (kind == MediaKind.IMAGE) null else trackMimes(context, uri)
         return InputFile(
             uri, displayName, size, mime, kind,
-            durationMs = meta?.first,
-            hasAudio = kind == MediaKind.AUDIO || (meta?.second ?: true),
+            durationMs = duration,
+            hasAudio = kind == MediaKind.AUDIO || (tracks?.let { it.audio != null } ?: true),
+            videoMime = tracks?.video,
+            audioMime = tracks?.audio,
         )
     }
 
+    private class Tracks(val video: String?, val audio: String?)
+
     /**
-     * Zählt die Spuren selbst – METADATA_KEY_HAS_AUDIO ist nicht auf allen Geräten
-     * zuverlässig (Samsung liefert bei Bildschirmaufnahmen null).
+     * Codecs der ersten Bild- und Tonspur. Zählt die Spuren selbst – METADATA_KEY_HAS_AUDIO ist
+     * nicht auf allen Geräten zuverlässig (Samsung liefert bei Bildschirmaufnahmen null).
      */
-    private fun hasAudioTrack(context: Context, uri: Uri): Boolean? {
+    private fun trackMimes(context: Context, uri: Uri): Tracks? {
         val extractor = MediaExtractor()
         return try {
             extractor.setDataSource(context, uri, null)
-            (0 until extractor.trackCount).any {
-                extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-            }
+            val mimes = (0 until extractor.trackCount).mapNotNull { extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME) }
+            Tracks(video = mimes.firstOrNull { it.startsWith("video/") }, audio = mimes.firstOrNull { it.startsWith("audio/") })
         } catch (e: Exception) {
             null
         } finally {
@@ -69,13 +73,11 @@ object FileInspector {
         }
     }
 
-    /** Dauer und ob eine Tonspur vorhanden ist. */
-    private fun readMeta(context: Context, uri: Uri): Pair<Long?, Boolean?>? {
+    private fun readDuration(context: Context, uri: Uri): Long? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, uri)
-            val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-            duration to hasAudioTrack(context, uri)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
         } catch (e: Exception) {
             null
         } finally {

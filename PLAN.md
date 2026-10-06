@@ -1,8 +1,8 @@
 # Simple Converter – Projektplan
 
-Stand: 06.10.2026 · Neueste Version: **v0.3.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
+Stand: 06.10.2026 · Neueste Version: **v0.5.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.4.0 veröffentlicht (Kürzen, Lautstärke, Verlauf, Vorschaubilder, Barrierefreiheit). Widget und Schnell-Kachel: später / vielleicht.
+**Aktueller Schwerpunkt:** v0.5.0 (Geschwindigkeit) veröffentlicht. Als Nächstes v0.6: Bibliotheken aktualisieren, Baseline Profile. Widget und Schnell-Kachel: später / vielleicht.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -225,6 +225,25 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 - [x] Vorschaubilder in Setup und Verlauf (System-Thumbnails ab Android 10, Zwischenspeicher im RAM); in den Einstellungen abschaltbar (Standard: an)
 - [x] **Barrierefreiheit**: Überschriften für TalkBack, Emojis/Vorschaubilder als Deko ausgeblendet, Vorgaben als Auswahlgruppe, Regler beschriftet, Auf-/Zuklappen mit Zustand, Dateiwechsel wird angesagt; Schriftgröße 200 % geprüft (Titel einzeilig mit „…“); automatische Prüfung auf unbeschriftete Bedienelemente; Debug-Testschalter `--ef debugFontScale 2.0`
 
+### v0.5 – Geschwindigkeit ✅ (Release v0.5.0)
+
+Gemessen auf Galaxy S24 Ultra (Android 16) mit `PerfTest` und nicht-debuggbarem Build (`-Pperf`), Ergebnisse in Abschnitt 7.
+
+- [x] **Ohne Neu-Kodieren:** Vorgaben „Original behalten“ (MP4: kürzen / Ton entfernen) und „Original-Ton“ (M4A aus AAC-Tonspur), nur angeboten, wenn die Spuren in den Container passen; Rückfall auf normales Umwandeln bei Fehlern
+- [x] **Audio schneller:** MediaCodec asynchron, ab Android 15 gebündelt („Large audio frame“) für AAC/MP3/Opus/Vorbis; WAV ohne Dekoder; Wächter gegen hängende Codecs
+- [x] **Dekodieren und Kodieren parallel** (`PipelineSink`): vorher wechselten beide auf einem Thread ab und brauchten zusammen doppelt so lange
+- [x] **Lautstärke in einem Dekodier-Durchgang:** beim Messen entsteht eine WAV-Zwischendatei, der zweite Durchgang liest nur noch diese
+- [x] **Bild-Stapel parallel** (bis 4 gleichzeitig, je nach Kernen und Speicher)
+- [x] **Weniger Speicher-Allokationen** (wiederverwendete Puffer, JNI ohne Kopien)
+- [x] **Kleinere APK:** kein 32-Bit-x86 mehr
+- [x] **FLAC:** eigener FLAC-Leser (`FlacSource`, prüft jede Frame-Grenze per CRC-8, Nummer und CRC-16), weil die Leser von Android und Media3 1.5 manche Dateien falsch zerlegen; FLAC-Dateien der App tragen jetzt Frame-Größen und MD5 im Kopf
+
+### v0.6 – Wartung (geplant)
+
+- [ ] **Alles aktualisieren:** alle Bibliotheken und Build-Werkzeuge auf den neuesten Stand (Media3, Compose, AndroidX, Android Gradle Plugin, Kotlin, Gradle, NDK/CMake, compileSdk/targetSdk), vollständiger Testlauf
+- [ ] Baseline Profile (Macrobenchmark-Modul) für schnelleren App-Start
+- [ ] Prüfen, ob neuere Media3-Versionen den FLAC-Fehler am Dateiende behoben haben
+
 ### Später / vielleicht
 
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
@@ -369,6 +388,34 @@ Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Enco
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.
 - Videos ohne Tonspur boten „Nur Ton“ an und scheiterten mit technischer Meldung → Tonspur wird per `MediaExtractor` erkannt (Samsung liefert `METADATA_KEY_HAS_AUDIO` nicht), Ton-Optionen werden ausgeblendet.
 - „Fertig“-Benachrichtigung wurde sofort wieder entfernt → wird erst gelöscht, wenn die App sichtbar ist.
+
+**v0.5 Geschwindigkeit (06.10.2026)** – Unit-Tests 42, Geräte-Tests 6/6, Lint ohne Befund
+
+Galaxy S24 Ultra, `PerfTest` mit `-Pperf` (nicht debuggbar), beide Versionen gleich gemessen; jede Ausgabe wird wieder eingelesen und ihre Länge geprüft.
+
+| Messung | v0.4 | v0.5 |
+|---|---|---|
+| 10 min WAV → MP3 | 23,4 s | 12,1 s |
+| 10 min WAV → Opus | 58,8 s | 9,0 s |
+| 10 min WAV → FLAC | 15,9 s | 3,8 s |
+| 10 min FLAC → MP3 | 119,0 s | 12,0 s |
+| FLAC 1:00–6:00 → MP3 | 83,2 s | 6,1 s |
+| 10 min WAV → WAV | 9,0 s | 0,2 s |
+| 10 min WAV → MP3 + Lautstärke | 36,3 s | 12,9 s |
+| 10 min M4A → MP3 + Lautstärke | 135,0 s | 14,8 s |
+| M4A 1:00–6:00 → MP3 + Lautstärke | 66,2 s | 7,6 s |
+| 24 Bilder 12 MP PNG → JPG | 7,7 s | 4,2 s |
+| Video 60 s → MP4 gekürzt 10–40 s | 13,3 s | 13,4 s (neu kodiert) / 2,0 s („Original behalten“) |
+| Video 60 s → Nur Ton M4A | 1,0 s | 0,9 s |
+
+| Test | Ergebnis |
+|---|---|
+| Vorgabe „Original behalten“ (294 MB Video) in der App | ✅ 4,9 s, „Erweitert“ ausgeblendet |
+| Vorgabe „Original-Ton“ (M4A) in der App | ✅ steht oben, 2,2 s |
+
+**Gefunden und behoben**
+- FLAC-Dateien wurden beim Wiedereinlesen um 0,1–0,3 s zu kurz (schon in v0.4: 599,83 s statt 600 s). Ursache: Der FLAC-Encoder lässt Frame-Größen und MD5 im Dateikopf leer, und die Leser von Android und Media3 zerlegen solche (und manche andere) Dateien falsch → Kopf wird vervollständigt, eigener FLAC-Leser.
+- Dekodieren und Kodieren auf einem Thread dauerten zusammen doppelt so lange wie einzeln → `PipelineSink`.
 
 ### Manuelle Testmatrix
 

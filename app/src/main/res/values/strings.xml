@@ -235,4 +235,10 @@
     <string name="a11y_collapsed">collapsed</string>
     <string name="a11y_expand">expand</string>
     <string name="a11y_collapse">collapse</string>
+
+    <!-- Ohne Neu-Kodieren -->
+    <string name="preset_copy">Keep original</string>
+    <string name="preset_copy_desc">No re-encoding: very fast, no quality loss – for trimming or removing audio</string>
+    <string name="preset_copy_audio">Original audio</string>
+    <string name="preset_copy_audio_desc">Audio track is copied as-is: very fast, lossless</string>
 </resources>
