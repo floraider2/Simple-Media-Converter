@@ -368,9 +368,9 @@ Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Enco
 ## 10. Offene Fragen
 
 1. ~~Git-Identität~~ → `floraider2` mit der anonymen GitHub-Adresse (noreply)
-2. ~~Remote~~ → GitHub `floraider2/Simple-Media-Converter`. Der ältere Branch `claude/friendly-einstein-c1yujb` (FFmpeg-Variante) wird nicht weiterverfolgt.
+2. ~~Remote~~ → GitHub `floraider2/Simple-Media-Converter`, öffentlich. Einziger und Standard-Branch: `media3-v0.1`.
 3. **Paketname**: `com.simpleconverter.app` ist ein Platzhalter – eigene Domain/Name gewünscht? (Muss vor dem ersten Store-Release feststehen, danach nicht mehr änderbar.)
-4. **App-Lizenz**: GPL-3.0 oder Apache-2.0? (LAME ist LGPL und als eigene .so eingebunden – passt zu beiden.)
+4. ~~App-Lizenz~~ → **GPL-3.0** (Vorschlag aus Abschnitt 9, LICENSE liegt im Repo). (LAME ist LGPL und als eigene .so eingebunden – passt zu beiden.)
 5. **Sprache**: Englisch ab v0.3 genug, oder weitere Sprachen?
 6. **Testgerät**: Welches Android-Handy steht zum Testen zur Verfügung?
 

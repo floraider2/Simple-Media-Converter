@@ -41,9 +41,14 @@ Tests:
 ./gradlew connectedDebugAndroidTest  # Ende-zu-Ende auf angeschlossenem Gerät
 ```
 
-## Lizenzen
+## Lizenz
 
+Simple Converter ist freie Software unter der **GNU General Public License v3.0**, siehe [LICENSE](LICENSE).
 MP3 nutzt LAME (LGPL), siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Download
+
+Fertige APKs gibt es unter [Releases](https://github.com/floraider2/Simple-Media-Converter/releases). Wie Releases entstehen: [RELEASING.md](RELEASING.md).
 
 ## Struktur
 

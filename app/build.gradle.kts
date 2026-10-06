@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -27,8 +29,26 @@ android {
         }
     }
 
+    signingConfigs {
+        // Release-Signatur: lokal aus ../SimpleConverter-Signing/keystore.properties,
+        // in GitHub Actions aus Umgebungsvariablen (siehe RELEASING.md). Fehlt beides,
+        // bleibt die Release-APK unsigniert.
+        val localProps = rootProject.file("../SimpleConverter-Signing/keystore.properties")
+        val props = Properties().apply { if (localProps.exists()) localProps.inputStream().use { load(it) } }
+        val storePath = System.getenv("SIGNING_STORE_FILE") ?: props.getProperty("storeFile")
+        if (storePath != null) {
+            create("release") {
+                storeFile = file(storePath)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: props.getProperty("storePassword")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: props.getProperty("keyAlias")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: props.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
