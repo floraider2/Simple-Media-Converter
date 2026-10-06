@@ -30,11 +30,18 @@ import com.simpleconverter.app.model.RecentItem
 import com.simpleconverter.app.model.outputFileName
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
@@ -64,7 +71,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val status = MutableStateFlow(Status(0, count, files.first().name, PHASE_CONVERT, 0))
         runCatching { setForeground(foregroundInfo(status.value)) }
 
-        val copies = mutableMapOf<Int, File>()
+        val copies = ConcurrentHashMap<Int, File>()
         val results = mutableListOf<FileResult>()
 
         return coroutineScope {
@@ -82,15 +89,20 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
             try {
                 prepareInputs(files, copies) { i, p -> status.value = Status(i, count, files[i].name, PHASE_COPY, p) }
 
-                files.forEachIndexed { i, file ->
-                    status.value = Status(i, count, file.name, PHASE_CONVERT, 0)
-                    results += convertOne(
-                        file, copies[i], job.settings,
-                        onCopy = { p -> status.value = Status(i, count, file.name, PHASE_COPY, p) },
-                        onProgress = { p -> status.value = Status(i, count, file.name, PHASE_CONVERT, p) },
-                    )
-                    copies.remove(i)?.delete()
-                    JobStore.saveResults(context, jobId, results)
+                val parallel = parallelism(job.settings.format, count)
+                if (parallel > 1) {
+                    results += convertParallel(files, copies, job.settings, parallel, jobId, status)
+                } else {
+                    files.forEachIndexed { i, file ->
+                        status.value = Status(i, count, file.name, PHASE_CONVERT, 0)
+                        results += convertOne(
+                            file, copies[i], job.settings,
+                            onCopy = { p -> status.value = Status(i, count, file.name, PHASE_COPY, p) },
+                            onProgress = { p -> status.value = Status(i, count, file.name, PHASE_CONVERT, p) },
+                        )
+                        copies.remove(i)?.delete()
+                        JobStore.saveResults(context, jobId, results)
+                    }
                 }
 
                 if (!appInForeground()) notifyFinished(results)
@@ -106,6 +118,62 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 copies.values.forEach { it.delete() }
             }
         }
+    }
+
+    /** Passt eine WAV-Zwischendatei (48 kHz Stereo angenommen) in den Cache, mit Reserve? */
+    private fun hasRoomForPcm(durationMs: Long?): Boolean {
+        val ms = durationMs ?: return false
+        val bytes = ms / 1000 * 48_000L * 2 * 2
+        return applicationContext.cacheDir.usableSpace - RESERVE_BYTES > bytes
+    }
+
+    /**
+     * Wie viele Dateien gleichzeitig? Bilder und reine Audio-Ausgaben (MP3/Opus/FLAC/WAV) laufen
+     * auf der CPU und vertragen mehrere gleichzeitig; Video und M4A brauchen den Hardware-Encoder,
+     * der nur einmal da ist. Bei Bildern begrenzt zusätzlich der Arbeitsspeicher (ein 12-MP-Foto
+     * belegt dekodiert rund 50 MB).
+     */
+    private fun parallelism(format: OutputFormat, count: Int): Int {
+        if (count < 2) return 1
+        val cores = Runtime.getRuntime().availableProcessors()
+        val byKind = when (format) {
+            OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP -> {
+                val byMemory = (Runtime.getRuntime().maxMemory() / IMAGE_MEMORY_BUDGET).toInt()
+                minOf(4, cores / 2, byMemory)
+            }
+            OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV -> minOf(2, cores / 2)
+            else -> 1
+        }
+        return byKind.coerceIn(1, count)
+    }
+
+    /** Mehrere Dateien gleichzeitig; Ergebnisse bleiben in der Reihenfolge der Eingabe. */
+    private suspend fun convertParallel(
+        files: List<InputFile>,
+        copies: ConcurrentHashMap<Int, File>,
+        settings: ConversionSettings,
+        parallel: Int,
+        jobId: UUID,
+        status: MutableStateFlow<Status>,
+    ): List<FileResult> = coroutineScope {
+        val count = files.size
+        val slots = arrayOfNulls<FileResult>(count)
+        val done = AtomicInteger(0)
+        val permits = Semaphore(parallel)
+        val saveLock = Mutex()
+        files.mapIndexed { i, file ->
+            launch(Dispatchers.Default) {
+                permits.withPermit {
+                    slots[i] = convertOne(file, copies[i], settings, onCopy = {}, onProgress = {})
+                    copies.remove(i)?.delete()
+                    val finished = done.incrementAndGet()
+                    // Fortschritt = Anteil fertiger Dateien
+                    status.value = Status(minOf(finished, count - 1), count, file.name, PHASE_CONVERT, if (finished == count) 100 else 0)
+                    saveLock.withLock { JobStore.saveResults(applicationContext, jobId, slots.filterNotNull()) }
+                }
+            }
+        }.joinAll()
+        slots.map { it!! }
     }
 
     /**
@@ -145,16 +213,41 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
             onProgress(0)
             // Lautstärke angleichen: erster Durchgang misst (0–40 %), zweiter wandelt um (40–100 %).
             val withAudio = settings.format.kind == MediaKind.AUDIO || (file.hasAudio && !settings.removeAudio)
-            val normalize = settings.normalizeLoudness && withAudio && settings.format.kind != MediaKind.IMAGE
-            val gainDb = if (normalize) Loudness.measureGainDb(context, input, settings) { onProgress(it * 40 / 100) } else 0.0
+            val normalize = settings.normalizeLoudness && withAudio && settings.format.kind != MediaKind.IMAGE && !settings.passthrough
+            val measureProgress: (Int) -> Unit = { onProgress(it * 40 / 100) }
             val convertProgress: (Int) -> Unit = if (normalize) { p -> onProgress(40 + p * 60 / 100) } else onProgress
-            when (settings.format) {
-                OutputFormat.MP4, OutputFormat.WEBM, OutputFormat.M4A ->
-                    VideoConverter.convert(context, input, temp, settings, file.durationMs, convertProgress, gainDb)
-                OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV ->
-                    AudioConverter.convert(context, input, temp, settings, convertProgress, gainDb)
-                OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP ->
-                    ImageConverter.convert(context, input, temp, settings)
+            val pcmPath = settings.format in PCM_FORMATS
+            // Reines Audio-Ziel: beim Messen gleich eine WAV-Zwischendatei schreiben, dann wird die Quelle
+            // nur einmal dekodiert. Nur wenn genug Platz frei ist (10 min Stereo ≈ 110 MB).
+            val pcmFile = if (normalize && pcmPath && hasRoomForPcm(settings.trimmedDurationMs(file.durationMs))) {
+                File(File(context.cacheDir, "out").apply { mkdirs() }, "${UUID.randomUUID()}.wav")
+            } else {
+                null
+            }
+            try {
+                val gainDb = when {
+                    !normalize -> 0.0
+                    pcmFile != null -> Loudness.measureToWav(context, input, settings, pcmFile, measureProgress)
+                    else -> Loudness.measureGainDb(context, input, settings, measureProgress)
+                }
+                when (settings.format) {
+                    OutputFormat.MP4, OutputFormat.WEBM, OutputFormat.M4A ->
+                        VideoConverter.convert(context, input, temp, settings, file.durationMs, convertProgress, gainDb)
+                    OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV ->
+                        if (pcmFile != null) {
+                            // Zwischendatei ist schon gekürzt.
+                            AudioConverter.convert(
+                                context, Uri.fromFile(pcmFile), temp,
+                                settings.copy(trimStartMs = null, trimEndMs = null), convertProgress, gainDb,
+                            )
+                        } else {
+                            AudioConverter.convert(context, input, temp, settings, convertProgress, gainDb)
+                        }
+                    OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP ->
+                        ImageConverter.convert(context, input, temp, settings)
+                }
+            } finally {
+                pcmFile?.delete()
             }
             val outputSize = temp.length()
             val outputUri = OutputStore.save(context, temp, outputName, settings.format, settings.outputFolder)
@@ -227,6 +320,11 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         /** So viel Platz bleibt beim Vorab-Kopieren mindestens frei. */
         private const val RESERVE_BYTES = 500L * 1024 * 1024
+
+        private val PCM_FORMATS = setOf(OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV)
+
+        /** Arbeitsspeicher, den eine parallele Bild-Umwandlung höchstens braucht. */
+        private const val IMAGE_MEMORY_BUDGET = 128L * 1024 * 1024
 
         fun inputData(jobId: UUID): Data = workDataOf(KEY_JOB_ID to jobId.toString())
     }

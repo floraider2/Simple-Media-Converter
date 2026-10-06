@@ -1,6 +1,7 @@
 package com.simpleconverter.app.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -85,6 +86,7 @@ class SettingsAndPresetsTest {
             trimStartMs = 1_500,
             trimEndMs = 9_000,
             normalizeLoudness = true,
+            passthrough = true,
         )
         assertEquals(settings, ConversionSettings.fromData(settings.toData()))
     }
@@ -110,6 +112,27 @@ class SettingsAndPresetsTest {
         assertEquals(1_000L, merged.trimStartMs)
         assertEquals(2_000L, merged.trimEndMs)
         assertTrue(merged.keepMetadata)
+    }
+
+    @Test
+    fun `Original behalten nur bei passenden Codecs`() {
+        val avc = "video/avc"; val vp9 = "video/x-vnd.on2.vp9"; val aac = "audio/mp4a-latm"; val opus = "audio/opus"
+        val none = Presets.NO_AUDIO
+        assertTrue(Presets.canCopy(OutputFormat.MP4, listOf(avc), listOf(aac)))
+        assertTrue(Presets.canCopy(OutputFormat.MP4, listOf("video/hevc"), listOf(none)))
+        assertFalse(Presets.canCopy(OutputFormat.MP4, listOf(vp9), listOf(aac)))
+        assertFalse(Presets.canCopy(OutputFormat.MP4, listOf(avc), listOf(opus)))
+        assertFalse(Presets.canCopy(OutputFormat.MP4, listOf(avc, vp9), listOf(aac, aac)))
+        assertTrue(Presets.canCopy(OutputFormat.M4A, listOf(avc), listOf(aac)))
+        assertFalse(Presets.canCopy(OutputFormat.M4A, listOf(null), listOf("audio/mpeg")))
+        assertFalse(Presets.canCopy(OutputFormat.MP3, listOf(avc), listOf(aac)))
+    }
+
+    @Test
+    fun `beim Kopieren wird keine Lautstaerke angeglichen`() {
+        val mine = ConversionSettings(OutputFormat.M4A, normalizeLoudness = true)
+        val copy = ConversionSettings(OutputFormat.M4A, passthrough = true).withUserChoicesFrom(mine)
+        assertFalse(copy.normalizeLoudness)
     }
 
     @Test

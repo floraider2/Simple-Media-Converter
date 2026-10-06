@@ -189,7 +189,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectPreset(id: String) {
         val current = _screen.value as? Screen.Setup ?: return
-        val preset = Presets.forFormat(current.format).firstOrNull { it.id == id } ?: return
+        val preset = Presets.available(current.format, current.files).firstOrNull { it.id == id } ?: return
         _screen.value = current.copy(presetId = id, settings = preset.settings.withUserChoicesFrom(current.settings))
     }
 
@@ -198,7 +198,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         val current = _screen.value as? Screen.Setup ?: return
         val updated = transform(current.settings)
         // „Kameradaten behalten“ ist unabhängig von der Vorgabe.
-        val matching = Presets.forFormat(current.format)
+        val matching = Presets.available(current.format, current.files)
             .firstOrNull { it.settings.withUserChoicesFrom(updated) == updated }
         _screen.value = current.copy(settings = updated, presetId = matching?.id)
     }
@@ -360,7 +360,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         getApplication<Application>().resources.getQuantityString(id, count, count)
 
     private fun setupFor(files: List<InputFile>, format: OutputFormat): Screen.Setup {
-        val first = Presets.forFormat(format).first()
+        val first = Presets.available(format, files).first()
         val settings = first.settings.copy(keepMetadata = appSettings.value.keepMetadata)
         return Screen.Setup(files, format, first.id, settings)
     }

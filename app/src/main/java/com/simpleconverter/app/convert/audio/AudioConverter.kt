@@ -25,7 +25,10 @@ object AudioConverter {
         onProgress: (Int) -> Unit,
         gainDb: Double = 0.0,
     ) = withContext(Dispatchers.IO) {
-        val sink = sinkFor(output, settings).let { if (gainDb == 0.0) it else GainSink(it, Loudness.linear(gainDb)) }
+        // Kodieren auf eigenem Thread (außer WAV, das ist nur Kopieren); die Verstärkung rechnet der Dekoder-Thread.
+        val sink = sinkFor(output, settings)
+            .let { if (settings.format == OutputFormat.WAV) it else PipelineSink(it) }
+            .let { if (gainDb == 0.0) it else GainSink(it, Loudness.linear(gainDb)) }
         PcmDecoder.decode(
             context, input, sink, onProgress,
             startUs = (settings.trimStartMs ?: 0L) * 1000,

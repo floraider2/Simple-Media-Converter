@@ -1,9 +1,12 @@
 package com.simpleconverter.app.convert.audio
 
 import android.media.MediaCodec
+import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
 import androidx.media3.common.C
@@ -16,6 +19,10 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 
 // ───────────────────────── WAV ─────────────────────────
 
@@ -35,11 +42,14 @@ class WavSink(private val output: File) : PcmSink {
         }
     }
 
+    private var bytes = ByteArray(0)
+
     override fun write(pcm: ByteBuffer) {
-        val bytes = ByteArray(pcm.remaining())
-        pcm.get(bytes)
-        out.write(bytes)
-        dataBytes += bytes.size
+        val n = pcm.remaining()
+        if (bytes.size < n) bytes = ByteArray(n)
+        pcm.get(bytes, 0, n)
+        out.write(bytes, 0, n)
+        dataBytes += n
     }
 
     override fun finish() {
@@ -80,13 +90,21 @@ class WavSink(private val output: File) : PcmSink {
 /**
  * Gemeinsame Basis für Encoder des Systems: füttert PCM in MediaCodec und reicht
  * die kodierten Pakete an [onEncoded] weiter.
+ *
+ * Asynchron (Rückrufe) und – wo möglich, ab Android 15 – gebündelt: Software-Encoder laufen in
+ * einem eigenen Systemprozess, jedes einzelne Paket (bei Opus alle 20 ms) kostet sonst einen
+ * Hin-und-Rückweg. [onEncoded] und [onOutputFormat] laufen auf dem Rückruf-Thread, [onFinished]
+ * danach auf dem aufrufenden Thread.
  */
 abstract class EncoderSink(private val mime: String) : PcmSink {
-    private lateinit var codec: MediaCodec
+    private var codec: MediaCodec? = null
+    private var thread: HandlerThread? = null
+    private val freeInputs = LinkedBlockingQueue<Int>()
+    private val done = CountDownLatch(1)
+    @Volatile private var failure: Exception? = null
     private var sampleRate = 0
     private var channels = 0
     private var framesQueued = 0L
-    private val info = MediaCodec.BufferInfo()
 
     protected abstract fun configure(format: MediaFormat)
     protected abstract fun onOutputFormat(format: MediaFormat)
@@ -98,78 +116,147 @@ abstract class EncoderSink(private val mime: String) : PcmSink {
         this.channels = channels
         val format = MediaFormat.createAudioFormat(mime, sampleRate, channels)
         configure(format)
-        codec = try {
-            MediaCodec.createEncoderByType(mime)
+        // FLAC ist ungebündelt nicht langsamer, gebündelt aber weniger erprobt.
+        val batchName = if (Build.VERSION.SDK_INT >= 35 && mime != MediaFormat.MIMETYPE_AUDIO_FLAC) batchingEncoder(mime) else null
+        codec = batchName?.let { name ->
+            runCatching { open(name, format, batching = true) }
+                .onFailure { if (it is ConversionException) throw it }
+                .getOrNull()
+        } ?: open(null, format, batching = false)
+    }
+
+    private fun open(name: String?, base: MediaFormat, batching: Boolean): MediaCodec {
+        val c = try {
+            if (name != null) MediaCodec.createByCodecName(name) else MediaCodec.createEncoderByType(mime)
         } catch (e: Exception) {
             throw ConversionException(R.string.err_audio_encoder_missing)
         }
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        codec.start()
+        val t = HandlerThread("EncoderSink").apply { start() }
+        try {
+            c.setCallback(callback, Handler(t.looper))
+            // Kopie nur im Bündel-Zweig (Android 15+); der Kopier-Konstruktor gibt es erst ab Android 10.
+            val f = if (batching && Build.VERSION.SDK_INT >= 35) {
+                MediaFormat(base).apply {
+                    setInteger(MediaFormat.KEY_BUFFER_BATCH_MAX_OUTPUT_SIZE, 256 * 1024)
+                    setInteger(MediaFormat.KEY_BUFFER_BATCH_THRESHOLD_OUTPUT_SIZE, 128 * 1024)
+                }
+            } else {
+                base
+            }
+            // Große Eingangspuffer: weniger Hin-und-Rückwege beim Einspeisen.
+            f.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, INPUT_BYTES)
+            c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            c.start()
+        } catch (e: Exception) {
+            runCatching { c.release() }
+            t.quitSafely()
+            throw e
+        }
+        thread = t
+        return c
+    }
+
+    private val callback = object : MediaCodec.Callback() {
+        override fun onInputBufferAvailable(c: MediaCodec, index: Int) = freeInputs.put(index)
+        override fun onOutputBufferAvailable(c: MediaCodec, index: Int, info: MediaCodec.BufferInfo) = output(c, index, listOf(info))
+        override fun onOutputBuffersAvailable(c: MediaCodec, index: Int, infos: java.util.ArrayDeque<MediaCodec.BufferInfo>) =
+            output(c, index, infos.toList())
+        override fun onOutputFormatChanged(c: MediaCodec, format: MediaFormat) = guarded { onOutputFormat(format) }
+        override fun onError(c: MediaCodec, e: MediaCodec.CodecException) = fail(e)
+    }
+
+    private fun output(c: MediaCodec, index: Int, frames: List<MediaCodec.BufferInfo>) = guarded {
+        val buffer = c.getOutputBuffer(index)!!
+        var eos = false
+        for (info in frames) {
+            if (info.size > 0) {
+                buffer.limit(info.offset + info.size).position(info.offset)
+                onEncoded(buffer, info)
+            }
+            if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) eos = true
+        }
+        c.releaseOutputBuffer(index, false)
+        if (eos) done.countDown()
+    }
+
+    private inline fun guarded(block: () -> Unit) {
+        try {
+            block()
+        } catch (e: Exception) {
+            fail(e)
+        }
+    }
+
+    private fun fail(e: Exception) {
+        failure = e
+        freeInputs.put(-1) // weckt einen wartenden write()/finish()
+        done.countDown()
+    }
+
+    private fun nextInput(): Int {
+        val since = System.currentTimeMillis()
+        while (true) {
+            failure?.let { throw it }
+            val index = freeInputs.poll(100, TimeUnit.MILLISECONDS)
+            if (index == null) {
+                if (System.currentTimeMillis() - since > STALL_MS) throw ConversionException(R.string.err_cannot_encode)
+                continue
+            }
+            if (index < 0) throw failure ?: IllegalStateException("Encoder gestoppt")
+            return index
+        }
     }
 
     override fun write(pcm: ByteBuffer) {
+        val c = codec!!
         val frameBytes = channels * 2
         while (pcm.hasRemaining()) {
-            val index = codec.dequeueInputBuffer(TIMEOUT_US)
-            if (index < 0) {
-                drain(false)
-                continue
-            }
-            val buffer = codec.getInputBuffer(index)!!
+            val index = nextInput()
+            val buffer = c.getInputBuffer(index)!!
             buffer.clear()
             // Nur ganze Frames einreihen, damit die Zeitstempel stimmen.
             val bytes = minOf(buffer.remaining(), pcm.remaining()) / frameBytes * frameBytes
             val chunk = pcm.duplicate().apply { limit(position() + bytes) }
             buffer.put(chunk)
             pcm.position(pcm.position() + bytes)
-            codec.queueInputBuffer(index, 0, bytes, framesQueued * 1_000_000 / sampleRate, 0)
+            c.queueInputBuffer(index, 0, bytes, framesQueued * 1_000_000 / sampleRate, 0)
             framesQueued += bytes / frameBytes
-            drain(false)
         }
     }
 
     override fun finish() {
-        while (true) {
-            val index = codec.dequeueInputBuffer(TIMEOUT_US)
-            if (index >= 0) {
-                codec.queueInputBuffer(index, 0, 0, framesQueued * 1_000_000 / sampleRate, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                break
-            }
-            drain(false)
+        val c = codec!!
+        c.queueInputBuffer(nextInput(), 0, 0, framesQueued * 1_000_000 / sampleRate, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+        val since = System.currentTimeMillis()
+        while (!done.await(100, TimeUnit.MILLISECONDS)) {
+            failure?.let { throw it }
+            // Wächter: lieber mit Fehler abbrechen als endlos warten.
+            if (System.currentTimeMillis() - since > STALL_MS) throw ConversionException(R.string.err_cannot_encode)
         }
-        drain(true)
+        failure?.let { throw it }
         onFinished(framesQueued)
     }
 
-    private fun drain(untilEnd: Boolean) {
-        while (true) {
-            // Beim Füttern nicht warten: nur abholen, was schon fertig ist. Sonst kostet jeder
-            // kleine Opus-Block (20 ms) bis zu 10 ms Wartezeit – bei langen Dateien Minuten.
-            val index = codec.dequeueOutputBuffer(info, if (untilEnd) TIMEOUT_US else 0L)
-            when {
-                index == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!untilEnd) return
-                index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> onOutputFormat(codec.outputFormat)
-                index >= 0 -> {
-                    val buffer = codec.getOutputBuffer(index)!!
-                    buffer.position(info.offset)
-                    buffer.limit(info.offset + info.size)
-                    if (info.size > 0) onEncoded(buffer, info)
-                    codec.releaseOutputBuffer(index, false)
-                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
-                }
-            }
-        }
-    }
-
     override fun release() {
-        if (::codec.isInitialized) {
-            runCatching { codec.stop() }
-            runCatching { codec.release() }
+        codec?.let {
+            runCatching { it.stop() }
+            runCatching { it.release() }
         }
+        thread?.quitSafely()
     }
 
-    companion object {
-        private const val TIMEOUT_US = 10_000L
+    private companion object {
+        const val INPUT_BYTES = 256 * 1024
+        const val STALL_MS = 15_000L
+
+        /** Ein Encoder (bevorzugt der von Android selbst), der mehrere Pakete auf einmal liefert. */
+        @RequiresApi(35)
+        fun batchingEncoder(mime: String): String? =
+            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+                .filter { it.isEncoder && mime in it.supportedTypes.map(String::lowercase) }
+                .filter { runCatching { it.getCapabilitiesForType(mime).isFeatureSupported("multiple-frames") }.getOrDefault(false) }
+                .sortedByDescending { it.name.startsWith("c2.android.") }
+                .firstOrNull()?.name
     }
 }
 
@@ -180,6 +267,15 @@ abstract class EncoderSink(private val mime: String) : PcmSink {
 class FlacSink(private val output: File, private val compressionLevel: Int = 5) : EncoderSink(MediaFormat.MIMETYPE_AUDIO_FLAC) {
     private val out = RandomAccessFile(output, "rw").apply { setLength(0) }
     private var headerWritten = false
+    private var minFrameBytes = Int.MAX_VALUE
+    private var maxFrameBytes = 0
+    private val md5 = MessageDigest.getInstance("MD5")
+
+    override fun write(pcm: ByteBuffer) {
+        // Prüfsumme über das unkomprimierte Audio (16 Bit, Little Endian, verschachtelt) – wie im FLAC-Standard.
+        md5.update(pcm.duplicate())
+        super.write(pcm)
+    }
 
     override fun configure(format: MediaFormat) {
         format.setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, compressionLevel)
@@ -196,15 +292,28 @@ class FlacSink(private val output: File, private val compressionLevel: Int = 5) 
             if (!bytes.startsWith(FLAC_MAGIC)) out.write(FLAC_MAGIC)
         } else if (!headerWritten) {
             throw ConversionException(R.string.err_flac_header)
+        } else {
+            minFrameBytes = minOf(minFrameBytes, bytes.size)
+            maxFrameBytes = maxOf(maxFrameBytes, bytes.size)
         }
         out.write(bytes)
     }
 
-    /** Trägt die Gesamtzahl der Samples in STREAMINFO ein, damit Player die Dauer kennen. */
+    /**
+     * Ergänzt STREAMINFO um Frame-Größen, Gesamtzahl der Samples und MD5 – der Encoder lässt sie leer.
+     * Ohne Frame-Größen zerlegen manche Leser (Android, Media3) die Datei falsch in Blöcke.
+     */
     override fun onFinished(totalFrames: Long) {
-        // „fLaC“(4) + Blockkopf(4) + min/max Blockgröße(4) + min/max Framegröße(6) = Byte 18:
-        // 20 Bit Samplerate, 3 Bit Kanäle, 5 Bit Bittiefe, 36 Bit Samples.
-        if (out.length() < 26) return
+        // „fLaC“(4) + Blockkopf(4): STREAMINFO beginnt bei Byte 8 (Typ 0 im ersten Blockkopf).
+        if (out.length() < 42) return
+        out.seek(4)
+        if (out.readUnsignedByte() and 0x7F != 0) return
+        // Byte 12: min/max Framegröße, je 24 Bit.
+        if (maxFrameBytes > 0) {
+            out.seek(12)
+            out.write(int24(minFrameBytes) + int24(maxFrameBytes))
+        }
+        // Byte 18: 20 Bit Samplerate, 3 Bit Kanäle, 5 Bit Bittiefe, 36 Bit Samples.
         out.seek(18)
         val packed = ByteArray(8).also { out.readFully(it) }
         var bits = 0L
@@ -216,7 +325,11 @@ class FlacSink(private val output: File, private val compressionLevel: Int = 5) 
         }
         out.seek(18)
         out.write(packed)
+        // Byte 26: MD5 des unkomprimierten Audios.
+        out.write(md5.digest())
     }
+
+    private fun int24(v: Int) = byteArrayOf((v shr 16).toByte(), (v shr 8).toByte(), v.toByte())
 
     override fun release() {
         super.release()
@@ -277,21 +390,27 @@ class StereoDownmix(private val next: PcmSink) : PcmSink {
         next.start(sampleRate, minOf(channels, 2))
     }
 
+    private var out = ByteBuffer.allocate(0)
+
     override fun write(pcm: ByteBuffer) {
         if (channels <= 2) return next.write(pcm)
         val input = pcm.order(ByteOrder.LITTLE_ENDIAN)
         val frames = input.remaining() / (channels * 2)
-        val out = ByteBuffer.allocate(frames * 4).order(ByteOrder.LITTLE_ENDIAN)
-        repeat(frames) {
-            val s = ShortArray(channels) { input.short }
-            // Reihenfolge laut Android: FL, FR, FC, LFE, BL, BR …
-            val center = if (channels > 2) s[2] * 0.707f else 0f
-            val back = if (channels > 5) Pair(s[4] * 0.707f, s[5] * 0.707f) else Pair(0f, 0f)
-            val l = (s[0] + center + back.first) / 1.707f
-            val r = (s[1] + center + back.second) / 1.707f
+        if (out.capacity() < frames * 4) out = ByteBuffer.allocate(frames * 4).order(ByteOrder.LITTLE_ENDIAN)
+        out.clear()
+        val base = input.position()
+        repeat(frames) { f ->
+            // Reihenfolge laut Android: FL, FR, FC, LFE, BL, BR … (direkt gelesen, ohne Hilfs-Array pro Sample)
+            val p = base + f * channels * 2
+            val center = input.getShort(p + 4) * 0.707f
+            val backL = if (channels > 5) input.getShort(p + 8) * 0.707f else 0f
+            val backR = if (channels > 5) input.getShort(p + 10) * 0.707f else 0f
+            val l = (input.getShort(p) + center + backL) / 1.707f
+            val r = (input.getShort(p + 2) + center + backR) / 1.707f
             out.putShort(l.toInt().coerceIn(-32768, 32767).toShort())
             out.putShort(r.toInt().coerceIn(-32768, 32767).toShort())
         }
+        input.position(input.limit())
         out.flip()
         next.write(out)
     }

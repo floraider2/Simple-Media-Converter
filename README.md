@@ -18,12 +18,12 @@ That's all. If you have ideas, feel free to [open an issue](https://github.com/f
 
 | Input | Output | Engine |
 |---|---|---|
-| 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264 or H.265 + AAC): resolution, bitrate, target size, remove audio; HDR is converted to SDR | Media3 Transformer (hardware) |
+| 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264 or H.265 + AAC): resolution, bitrate, target size, remove audio; HDR is converted to SDR. “Keep original”: trim or remove audio without re-encoding | Media3 Transformer (hardware) |
 | 🎬 Video | WebM (VP9 + Opus, Android 10+) | Media3 Transformer + MediaMuxer |
 | 🎬 Video / 🎵 Audio | MP3 (32–320 kbit/s) | LAME 3.100 (native, in this repo) |
-| 🎬 Video / 🎵 Audio | M4A (AAC) | Media3 Transformer |
+| 🎬 Video / 🎵 Audio | M4A (AAC); “Original audio” copies an AAC track without re-encoding | Media3 Transformer |
 | 🎬 Video / 🎵 Audio | Opus in OGG (Android 10+) | MediaCodec + MediaMuxer |
-| 🎬 Video / 🎵 Audio | FLAC (lossless) | MediaCodec |
+| 🎬 Video / 🎵 Audio | FLAC (lossless) | MediaCodec, own FLAC reader |
 | 🎬 Video / 🎵 Audio | WAV (16-bit PCM) | MediaCodec |
 | 🖼️ Image (JPG, PNG, WebP, HEIC, AVIF*) | JPG, PNG, WebP: resize, quality; EXIF is removed, optionally camera details are kept (never the location) | ImageDecoder / Bitmap.compress |
 
@@ -38,6 +38,7 @@ That's all. If you have ideas, feel free to [open an issue](https://github.com/f
 - **History** with search, filter and thumbnails.
 - **Settings:** default format per file type, save location, keep camera details, theme (system / light / dark), thumbnails on/off.
 - **Accessible:** works with TalkBack and large font sizes.
+- **Fast:** e.g. 10 minutes of AAC audio → MP3 with loudness normalization in about 15 seconds; trimming a video with “Keep original” takes about 2 seconds.
 - **Languages:** English and German. On Android 13+ you can choose the language for this app only (*Settings → Apps → Simple Converter → Language*).
 
 Requires Android 8 or newer.
@@ -83,6 +84,8 @@ Translations are welcome: copy `app/src/main/res/values/strings.xml` to `values-
 - **v0.2** ✅ Batch conversion, MP3/Opus/FLAC, WebM, H.265, HDR → SDR, “Save as”, keep camera details
 - **v0.3** ✅ English + German, settings, save location
 - **v0.4** ✅ Trim with preview, loudness normalization (−14 LUFS), history with search, thumbnails, accessibility
+- **v0.5** ✅ Speed: “Keep original” without re-encoding, much faster audio, parallel image batches, smaller APK
+- **v0.6** Update everything: all libraries and build tools (Media3, Compose, Android Gradle Plugin, Kotlin, Gradle) to the latest versions, plus faster app start (Baseline Profile)
 - **Maybe:** F-Droid and Play Store – not decided yet
 
 Details: [PLAN.md](PLAN.md) (German).
@@ -118,6 +121,7 @@ Das war's. Wenn ihr noch Ideen habt, [schreibt gern ein Issue](https://github.co
 - **Viele Dateien auf einmal**, z. B. 50 HEIC-Fotos → JPG
 - Läuft **im Hintergrund** mit Fortschritt in der Benachrichtigung
 - **Kürzen** mit Vorschau und **Lautstärke angleichen** (−14 LUFS)
+- **Schnell:** „Original behalten“ kürzt Videos oder entfernt den Ton ohne Neu-Kodieren in Sekunden; Audio wird ein Vielfaches schneller umgewandelt als in früheren Versionen
 - **Verlauf** mit Suche und Vorschaubildern
 - **Einstellungen:** Standardformat und Speicherort je Dateityp, Design (System/Hell/Dunkel)
 - **Barrierefrei:** mit TalkBack und großer Schrift nutzbar

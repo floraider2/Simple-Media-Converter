@@ -281,7 +281,7 @@ private fun HomeScreen(
 private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modifier) {
     var advanced by rememberSaveable { mutableStateOf(false) }
     val advancedState = expandedText(advanced)
-    val presets = Presets.forFormat(s.format)
+    val presets = Presets.available(s.format, s.files)
 
     // Der Knopf „Umwandeln“ bleibt unten fest stehen, nur die Einstellungen scrollen.
     Column(modifier) {
@@ -356,7 +356,7 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
             }
         }
 
-        if (hasAdvanced(s.format)) {
+        if (hasAdvanced(s.format) && !s.settings.passthrough) {
             HorizontalDivider()
             Row(
                 Modifier

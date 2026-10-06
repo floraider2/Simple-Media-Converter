@@ -42,6 +42,8 @@ object JobStore {
                     .put("kind", f.kind.name)
                     .put("duration", f.durationMs ?: 0L)
                     .put("hasAudio", f.hasAudio)
+                    .put("videoMime", f.videoMime ?: "")
+                    .put("audioMime", f.audioMime ?: "")
             )
         }
         val st = job.settings
@@ -60,6 +62,7 @@ object JobStore {
             .put("trimStartMs", st.trimStartMs ?: -1L)
             .put("trimEndMs", st.trimEndMs ?: -1L)
             .put("normalizeLoudness", st.normalizeLoudness)
+            .put("passthrough", st.passthrough)
         write(file(context, job.id, ""), JSONObject().put("files", files).put("settings", settings))
     }
 
@@ -76,6 +79,8 @@ object JobStore {
                 kind = MediaKind.valueOf(f.getString("kind")),
                 durationMs = f.getLong("duration").takeIf { it > 0 },
                 hasAudio = f.optBoolean("hasAudio", true),
+                videoMime = f.optString("videoMime").takeIf { it.isNotEmpty() },
+                audioMime = f.optString("audioMime").takeIf { it.isNotEmpty() },
             )
         }
         val s = o.getJSONObject("settings")
@@ -94,6 +99,7 @@ object JobStore {
             trimStartMs = s.optLong("trimStartMs", -1L).takeIf { it >= 0 },
             trimEndMs = s.optLong("trimEndMs", -1L).takeIf { it >= 0 },
             normalizeLoudness = s.optBoolean("normalizeLoudness", false),
+            passthrough = s.optBoolean("passthrough", false),
         )
         Job(id, files, settings)
     }.getOrNull()

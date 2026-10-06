@@ -10,6 +10,7 @@ import androidx.media3.common.util.UnstableApi
 import com.simpleconverter.app.model.ConversionSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.PI
@@ -47,15 +48,25 @@ class LoudnessMeter : PcmSink {
         subBlockSum = DoubleArray(channels)
     }
 
+    private var scratch = ShortArray(0)
+
     override fun write(pcm: ByteBuffer) {
+        // Ganzen Block auf einmal lesen statt Sample für Sample über den ShortBuffer.
         val shorts = pcm.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-        while (shorts.remaining() >= channels) {
+        val n = shorts.remaining()
+        if (scratch.size < n) scratch = ShortArray(n)
+        shorts.get(scratch, 0, n)
+        pcm.position(pcm.limit())
+        val samples = scratch
+        var i = 0
+        while (i + channels <= n) {
             for (c in 0 until channels) {
-                val s = shorts.get().toInt()
-                peak = max(peak, abs(s))
+                val s = samples[i + c].toInt()
+                if (s > peak) peak = s else if (-s > peak) peak = -s
                 val y = filters[c].process(s / 32768.0)
                 subBlockSum[c] += y * y
             }
+            i += channels
             if (++subBlockFill == samplesPerSubBlock) {
                 var z = 0.0
                 for (c in 0 until channels) {
@@ -66,7 +77,6 @@ class LoudnessMeter : PcmSink {
                 subBlockFill = 0
             }
         }
-        pcm.position(pcm.limit())
     }
 
     override fun finish() = Unit
@@ -173,6 +183,21 @@ object Loudness {
 
     fun linear(gainDb: Double): Float = 10.0.pow(gainDb / 20).toFloat()
 
+    /**
+     * Wie [measureGainDb], schreibt dabei aber das dekodierte (und schon gekürzte) Audio als WAV in
+     * [pcmFile]. Der zweite Durchgang liest dann diese Datei – ohne die Quelle ein zweites Mal zu dekodieren.
+     */
+    suspend fun measureToWav(context: Context, input: Uri, settings: ConversionSettings, pcmFile: File, onProgress: (Int) -> Unit): Double =
+        withContext(Dispatchers.IO) {
+            val meter = LoudnessMeter()
+            PcmDecoder.decode(
+                context, input, TeeSink(meter, WavSink(pcmFile)), onProgress,
+                startUs = (settings.trimStartMs ?: 0L) * 1000,
+                endUs = settings.trimEndMs?.let { it * 1000 },
+            )
+            gainDb(meter.integratedLufs, meter.peakDbfs)
+        }
+
     /** Erster Durchgang: Tonspur (im gewählten Ausschnitt) dekodieren und messen. Ergebnis: Verstärkung in dB. */
     suspend fun measureGainDb(context: Context, input: Uri, settings: ConversionSettings, onProgress: (Int) -> Unit): Double =
         withContext(Dispatchers.IO) {
@@ -186,14 +211,40 @@ object Loudness {
         }
 }
 
+/** Gibt dasselbe PCM an zwei Ziele weiter. */
+class TeeSink(private val first: PcmSink, private val second: PcmSink) : PcmSink {
+    override fun start(sampleRate: Int, channels: Int) {
+        first.start(sampleRate, channels)
+        second.start(sampleRate, channels)
+    }
+
+    override fun write(pcm: ByteBuffer) {
+        first.write(pcm.duplicate().order(ByteOrder.LITTLE_ENDIAN))
+        second.write(pcm)
+    }
+
+    override fun finish() {
+        first.finish()
+        second.finish()
+    }
+
+    override fun release() {
+        first.release()
+        second.release()
+    }
+}
+
 /** Verstärkt 16-Bit-PCM um einen festen Faktor, mit Begrenzung statt Übersteuerung. */
 class GainSink(private val next: PcmSink, private val gain: Float) : PcmSink {
+    private var out = ByteBuffer.allocate(0)
+
     override fun start(sampleRate: Int, channels: Int) = next.start(sampleRate, channels)
 
     override fun write(pcm: ByteBuffer) {
         if (gain == 1f) return next.write(pcm)
         val input = pcm.order(ByteOrder.LITTLE_ENDIAN)
-        val out = ByteBuffer.allocate(input.remaining()).order(ByteOrder.LITTLE_ENDIAN)
+        if (out.capacity() < input.remaining()) out = ByteBuffer.allocate(input.remaining()).order(ByteOrder.LITTLE_ENDIAN)
+        out.clear()
         while (input.remaining() >= 2) out.putShort(applyGain(input.short, gain))
         out.flip()
         next.write(out)

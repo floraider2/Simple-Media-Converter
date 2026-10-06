@@ -234,4 +234,10 @@
     <string name="a11y_collapsed">zugeklappt</string>
     <string name="a11y_expand">aufklappen</string>
     <string name="a11y_collapse">zuklappen</string>
+
+    <!-- Ohne Neu-Kodieren -->
+    <string name="preset_copy">Original behalten</string>
+    <string name="preset_copy_desc">Ohne Neu-Kodieren: blitzschnell, kein Qualitätsverlust – zum Kürzen oder Ton entfernen</string>
+    <string name="preset_copy_audio">Original-Ton</string>
+    <string name="preset_copy_audio_desc">Tonspur wird nur herauskopiert: blitzschnell, verlustfrei</string>
 </resources>

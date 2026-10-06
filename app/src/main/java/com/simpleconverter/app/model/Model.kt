@@ -50,6 +50,9 @@ data class InputFile(
     val durationMs: Long?,
     /** false bei Videos ohne Tonspur (z. B. Bildschirmaufnahmen). */
     val hasAudio: Boolean = true,
+    /** Codec der Bildspur bzw. Tonspur (z. B. „video/avc“, „audio/mp4a-latm“), falls bekannt. */
+    val videoMime: String? = null,
+    val audioMime: String? = null,
 ) {
     /** Zielformate, die für diese Datei Sinn ergeben. */
     fun targets(): List<OutputFormat> = OutputFormat.targetsFor(kind, hasAudio, android.os.Build.VERSION.SDK_INT)
@@ -81,6 +84,8 @@ data class ConversionSettings(
     val trimEndMs: Long? = null,
     /** Lautstärke auf −14 LUFS angleichen (zwei Durchgänge: messen, dann umwandeln). */
     val normalizeLoudness: Boolean = false,
+    /** Bild/Ton nur kopieren statt neu kodieren (schnell, verlustfrei) – „Original behalten“. */
+    val passthrough: Boolean = false,
 ) {
     val isTrimmed get() = trimStartMs != null || trimEndMs != null
 
@@ -98,7 +103,7 @@ data class ConversionSettings(
             keepMetadata = other.keepMetadata,
             trimStartMs = other.trimStartMs,
             trimEndMs = other.trimEndMs,
-            normalizeLoudness = other.normalizeLoudness,
+            normalizeLoudness = other.normalizeLoudness && !passthrough,
         )
 
     fun toData(): Data = workDataOf(
@@ -116,6 +121,7 @@ data class ConversionSettings(
         "trimStartMs" to (trimStartMs ?: -1L),
         "trimEndMs" to (trimEndMs ?: -1L),
         "normalizeLoudness" to normalizeLoudness,
+        "passthrough" to passthrough,
     )
 
     companion object {
@@ -134,6 +140,7 @@ data class ConversionSettings(
             trimStartMs = d.getLong("trimStartMs", -1L).takeIf { it >= 0 },
             trimEndMs = d.getLong("trimEndMs", -1L).takeIf { it >= 0 },
             normalizeLoudness = d.getBoolean("normalizeLoudness", false),
+            passthrough = d.getBoolean("passthrough", false),
         )
     }
 }
@@ -156,6 +163,29 @@ object Presets {
     private fun kbits(id: String, @StringRes label: Int, format: OutputFormat, kbit: Int) =
         Preset(id, label, R.string.kbits, ConversionSettings(format, audioBitrate = kbit * 1000), descriptionArg = kbit)
 
+    /**
+     * Vorgaben, die zu diesen Dateien passen: „Original behalten“ / „Original-Ton“ nur, wenn sich
+     * Bild bzw. Ton ohne Neu-Kodieren übernehmen lassen. Dann steht „Original-Ton“ bei M4A vorn.
+     */
+    fun available(format: OutputFormat, files: List<InputFile>): List<Preset> {
+        val all = forFormat(format)
+        val copyOk = canCopy(format, files.map { it.videoMime }, files.map { if (it.hasAudio) it.audioMime else NO_AUDIO })
+        if (!copyOk) return all.filterNot { it.settings.passthrough }
+        return if (format == OutputFormat.M4A) all.sortedByDescending { it.settings.passthrough } else all
+    }
+
+    /** Lässt sich ohne Neu-Kodieren in [format] übernehmen? (Liste je Datei; Ton [NO_AUDIO] = keine Tonspur.) */
+    fun canCopy(format: OutputFormat, videoMimes: List<String?>, audioMimes: List<String?>): Boolean = when (format) {
+        OutputFormat.MP4 -> videoMimes.isNotEmpty() &&
+            videoMimes.all { it in COPYABLE_VIDEO } && audioMimes.all { it == NO_AUDIO || it in COPYABLE_AUDIO }
+        OutputFormat.M4A -> audioMimes.isNotEmpty() && audioMimes.all { it in COPYABLE_AUDIO }
+        else -> false
+    }
+
+    const val NO_AUDIO = "-"
+    private val COPYABLE_VIDEO = setOf("video/avc", "video/hevc")
+    private val COPYABLE_AUDIO = setOf("audio/mp4a-latm")
+
     fun forFormat(format: OutputFormat): List<Preset> = when (format) {
         OutputFormat.MP4 -> listOf(
             Preset("whatsapp", R.string.preset_whatsapp, R.string.preset_whatsapp_desc,
@@ -166,6 +196,8 @@ object Presets {
                 ConversionSettings(format, videoShortSide = 480, videoBitrate = 700_000, audioBitrate = 96_000)),
             Preset("max", R.string.preset_max, R.string.preset_original_resolution,
                 ConversionSettings(format, videoBitrate = 12_000_000, audioBitrate = 192_000)),
+            Preset("copy", R.string.preset_copy, R.string.preset_copy_desc,
+                ConversionSettings(format, passthrough = true)),
         )
         OutputFormat.WEBM -> listOf(
             Preset("standard", R.string.preset_standard, R.string.preset_webm_desc,
@@ -193,6 +225,8 @@ object Presets {
         )
         OutputFormat.M4A -> listOf(
             kbits("standard", R.string.preset_standard, format, 192),
+            Preset("copy", R.string.preset_copy_audio, R.string.preset_copy_audio_desc,
+                ConversionSettings(format, passthrough = true)),
             kbits("high", R.string.preset_high, format, 256),
             Preset("small", R.string.preset_small, R.string.preset_m4a_small_desc,
                 ConversionSettings(format, audioBitrate = 96_000)),

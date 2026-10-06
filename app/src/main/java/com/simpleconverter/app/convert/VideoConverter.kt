@@ -54,11 +54,33 @@ object VideoConverter {
         onProgress: (Int) -> Unit,
         gainDb: Double = 0.0,
     ) {
+        if (settings.passthrough) {
+            // „Original behalten“: kopieren. Geht das nicht (exotischer Codec o. Ä.), in bester Qualität umwandeln.
+            try {
+                return export(context, input, output, settings, durationMs, onProgress, 0.0)
+            } catch (e: ExportException) {
+                output.delete()
+                return export(context, input, output, settings.copy(passthrough = false, videoBitrate = null), durationMs, onProgress, gainDb)
+            }
+        }
+        export(context, input, output, settings, durationMs, onProgress, gainDb)
+    }
+
+    private suspend fun export(
+        context: Context,
+        input: Uri,
+        output: File,
+        settings: ConversionSettings,
+        durationMs: Long?,
+        onProgress: (Int) -> Unit,
+        gainDb: Double,
+    ) {
+        val copy = settings.passthrough
         val audioOnly = settings.format == OutputFormat.M4A
         val removeAudio = !audioOnly && settings.removeAudio
 
         val probe = probe(context, input)
-        val videoOnly = if (audioOnly) Effects.EMPTY else videoEffects(probe, settings.videoShortSide)
+        val videoOnly = if (audioOnly || copy) Effects.EMPTY else videoEffects(probe, settings.videoShortSide)
         val effects = if (gainDb == 0.0 || removeAudio) videoOnly
         else Effects(listOf(GainAudioProcessor(Loudness.linear(gainDb))), videoOnly.videoEffects)
         val mediaItem = MediaItem.Builder()
@@ -80,7 +102,15 @@ object VideoConverter {
             .setEffects(effects)
             .build()
         val composition = Composition.Builder(EditedMediaItemSequence(edited))
-            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+            .apply {
+                if (copy) {
+                    // Spuren nur umpacken, nicht dekodieren/kodieren.
+                    setTransmuxAudio(true)
+                    setTransmuxVideo(!audioOnly)
+                } else {
+                    setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+                }
+            }
             .build()
         val webm = settings.format == OutputFormat.WEBM
         val videoMime = when {
@@ -123,6 +153,8 @@ object VideoConverter {
                     .setVideoMimeType(videoMime)
                     .setAudioMimeType(if (webm) MimeTypes.AUDIO_OPUS else MimeTypes.AUDIO_AAC)
                     .setEncoderFactory(encoderFactory)
+                    // Beim Kopieren mit Kürzen nur den Anfang bis zum nächsten Schlüsselbild neu kodieren.
+                    .experimentalSetTrimOptimizationEnabled(copy && settings.isTrimmed)
                     .apply {
                         if (webm) {
                             setMuxerFactory(WebmMuxer.Factory())

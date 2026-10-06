@@ -26,6 +26,7 @@ class Mp3Sink(private val output: File, private val bitrate: Int) : PcmSink {
     private var channels = 0
     private lateinit var out: RandomAccessFile
     private var buffer = ByteArray(0)
+    private var samples = ShortArray(0)
 
     override fun start(sampleRate: Int, channels: Int) {
         require(channels in 1..2) { "MP3 supports mono or stereo only" }
@@ -37,9 +38,11 @@ class Mp3Sink(private val output: File, private val bitrate: Int) : PcmSink {
 
     override fun write(pcm: ByteBuffer) {
         val shorts = pcm.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-        val samples = ShortArray(shorts.remaining()).also { shorts.get(it) }
+        val count = shorts.remaining()
+        if (samples.size < count) samples = ShortArray(count)
+        shorts.get(samples, 0, count)
         pcm.position(pcm.limit())
-        val frames = samples.size / channels
+        val frames = count / channels
         if (frames == 0) return
         // Faustregel aus der LAME-Doku: 1,25 × Samples + 7200 Bytes reichen immer.
         val needed = (frames * 5 / 4) + 7200

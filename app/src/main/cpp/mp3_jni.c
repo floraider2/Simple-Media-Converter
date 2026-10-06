@@ -30,17 +30,18 @@ FN(nativeInit)(JNIEnv *env, jclass clazz, jint sampleRate, jint channels, jint b
 JNIEXPORT jint JNICALL
 FN(nativeEncode)(JNIEnv *env, jclass clazz, jlong handle, jshortArray pcm, jint frames, jint channels, jbyteArray out) {
     lame_global_flags *lame = (lame_global_flags *) (intptr_t) handle;
-    jshort *samples = (*env)->GetShortArrayElements(env, pcm, NULL);
-    jbyte *buffer = (*env)->GetByteArrayElements(env, out, NULL);
     int size = (*env)->GetArrayLength(env, out);
+    /* Kritische Abschnitte: die JVM reicht die Arrays meist ohne Kopie durch. Dazwischen keine JNI-Aufrufe. */
+    jshort *samples = (*env)->GetPrimitiveArrayCritical(env, pcm, NULL);
+    jbyte *buffer = (*env)->GetPrimitiveArrayCritical(env, out, NULL);
     int written;
     if (channels == 2) {
         written = lame_encode_buffer_interleaved(lame, samples, frames, (unsigned char *) buffer, size);
     } else {
         written = lame_encode_buffer(lame, samples, samples, frames, (unsigned char *) buffer, size);
     }
-    (*env)->ReleaseShortArrayElements(env, pcm, samples, JNI_ABORT);
-    (*env)->ReleaseByteArrayElements(env, out, buffer, 0);
+    (*env)->ReleasePrimitiveArrayCritical(env, out, buffer, 0);
+    (*env)->ReleasePrimitiveArrayCritical(env, pcm, samples, JNI_ABORT);
     return written;
 }
 
