@@ -23,9 +23,11 @@ Offline-Medienkonverter für Android. Keine Werbung, keine Cloud, keine Anmeldun
 
 **Vorgaben:** Für WhatsApp · Für E-Mail (< 25 MB) · Kleinste Datei · Max. Qualität. Unter „Erweitert“ gibt es Auflösung, Zielgröße, Bitrate und Qualität.
 
-Ergebnisse lassen sich teilen, öffnen oder per **„Speichern unter …“** an einen beliebigen Ort kopieren.
+Ergebnisse landen standardmäßig in `Movies/`, `Music/` oder `Pictures/SimpleConverter`. In den **Einstellungen** lässt sich pro Dateityp ein anderer Standardordner wählen, beim Umwandeln auch ein Ordner nur für diese eine Datei. Außerdem: teilen, öffnen oder **„Speichern unter …“**.
 
-Die Umwandlung läuft in WorkManager mit einem Foreground Service und zeigt den Fortschritt in der Benachrichtigung. Ergebnisse landen in `Movies/`, `Music/` oder `Pictures/SimpleConverter`. Unter Android 8 und 9 liegen sie im App-Ordner.
+**Einstellungen:** Standardformat je Dateityp, Speicherort, „Kameradaten behalten“, Design (System/Hell/Dunkel). **Sprachen:** Englisch und Deutsch.
+
+Die Umwandlung läuft in WorkManager mit einem Foreground Service und zeigt den Fortschritt in der Benachrichtigung. Ohne eigenen Ordner landen Ergebnisse unter Android 8 und 9 im App-Ordner.
 
 ## Bauen
 
@@ -75,5 +77,6 @@ app/src/main/cpp/            JNI-Brücke + LAME-Quellcode
 ## Fahrplan
 
 - **v0.2:** ✅ Stapelverarbeitung, MP3/Opus/FLAC, WebM, H.265, HDR→SDR, „Speichern unter“, Kameradaten behalten
-- **v0.3:** Kürzen mit Vorschau, Lautstärke angleichen, Widget
+- **v0.3:** ✅ Englisch + Deutsch, Einstellungen, Speicherort
+- **v0.4:** Kürzen mit Vorschau, Lautstärke angleichen, Verlauf mit Suche, Widget
 - **v1.0:** F-Droid und Play Store, Open Source

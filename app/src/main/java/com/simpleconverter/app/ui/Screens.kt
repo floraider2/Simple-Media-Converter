@@ -365,6 +365,15 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
             }
         }
 
+        val defaults by vm.appSettings.collectAsStateWithLifecycle()
+        FolderRow(
+            title = stringResource(R.string.folder_title),
+            folder = s.folder(defaults),
+            kind = s.format.kind,
+            isDefault = s.customFolder == null,
+            onPick = vm::chooseFolderForThisConversion,
+        )
+
         if (first.kind == MediaKind.IMAGE) {
             Text(
                 stringResource(if (s.settings.keepMetadata) R.string.setup_privacy_keep else R.string.setup_privacy_strip),

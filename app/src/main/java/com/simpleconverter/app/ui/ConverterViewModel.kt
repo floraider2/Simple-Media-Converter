@@ -20,6 +20,7 @@ import com.simpleconverter.app.data.SettingsStore
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.InputFile
+import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
 import com.simpleconverter.app.model.Presets
 import com.simpleconverter.app.model.RecentItem
@@ -45,7 +46,12 @@ sealed interface Screen {
         /** null = „Eigene“ Einstellungen. */
         val presetId: String?,
         val settings: ConversionSettings,
-    ) : Screen
+        /** Für diese Umwandlung gewählter Ordner; null = Standard aus den Einstellungen. */
+        val customFolder: String? = null,
+    ) : Screen {
+        /** Wohin das Ergebnis geht: eigener Ordner, sonst Standard für den Ziel-Dateityp. */
+        fun folder(defaults: AppSettings): String? = customFolder ?: defaults.folderFor(format.kind)
+    }
     data class Working(
         val files: List<InputFile>,
         val format: OutputFormat,
@@ -141,7 +147,30 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectFormat(format: OutputFormat) {
         val current = _screen.value as? Screen.Setup ?: return
-        _screen.value = setupFor(current.files, format)
+        // Ein für diese Umwandlung gewählter Ordner bleibt beim Formatwechsel erhalten.
+        _screen.value = setupFor(current.files, format).copy(customFolder = current.customFolder)
+    }
+
+    /** Ordner nur für diese Umwandlung (null = zurück zum Standard). */
+    fun chooseFolderForThisConversion(tree: Uri?) {
+        val current = _screen.value as? Screen.Setup ?: return
+        tree?.let(::keepAccess)
+        _screen.value = current.copy(customFolder = tree?.toString())
+    }
+
+    /** Standardordner für einen Dateityp in den Einstellungen (null = Filme/Musik/Bilder). */
+    fun chooseDefaultFolder(kind: MediaKind, tree: Uri?) {
+        tree?.let(::keepAccess)
+        settingsStore.update { it.withFolder(kind, tree?.toString()) }
+    }
+
+    /** Dauerhafte Rechte, damit der Hintergrund-Worker auch später noch in den Ordner schreiben darf. */
+    private fun keepAccess(tree: Uri) {
+        runCatching {
+            getApplication<Application>().contentResolver.takePersistableUriPermission(
+                tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
     }
 
     fun selectPreset(id: String) {
@@ -175,7 +204,8 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
     fun startConversion() {
         val setup = _screen.value as? Screen.Setup ?: return
         val id = UUID.randomUUID()
-        JobStore.saveJob(getApplication(), JobStore.Job(id, setup.files, setup.settings))
+        val settings = setup.settings.copy(outputFolder = setup.folder(appSettings.value))
+        JobStore.saveJob(getApplication(), JobStore.Job(id, setup.files, settings))
         workManager.enqueue(
             OneTimeWorkRequestBuilder<ConversionWorker>()
                 .setId(id)

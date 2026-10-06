@@ -74,6 +74,8 @@ data class ConversionSettings(
     val hevc: Boolean = false,
     /** Bild: Kameradaten und Aufnahmezeit behalten (Standort wird immer entfernt). */
     val keepMetadata: Boolean = false,
+    /** Zielordner (Tree-URI aus der Ordnerauswahl); null = Standardordner (Filme/Musik/Bilder). */
+    val outputFolder: String? = null,
 ) {
     fun toData(): Data = workDataOf(
         "format" to format.name,
@@ -86,6 +88,7 @@ data class ConversionSettings(
         "imageQuality" to imageQuality,
         "hevc" to hevc,
         "keepMetadata" to keepMetadata,
+        "outputFolder" to outputFolder,
     )
 
     companion object {
@@ -100,6 +103,7 @@ data class ConversionSettings(
             imageQuality = d.getInt("imageQuality", 90),
             hevc = d.getBoolean("hevc", false),
             keepMetadata = d.getBoolean("keepMetadata", false),
+            outputFolder = d.getString("outputFolder"),
         )
     }
 }

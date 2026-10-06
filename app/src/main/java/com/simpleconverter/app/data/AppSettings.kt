@@ -16,7 +16,23 @@ data class AppSettings(
     val defaultImage: OutputFormat = OutputFormat.JPG,
     val keepMetadata: Boolean = false,
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    /** Standard-Zielordner je Dateityp (Tree-URI); null = Filme/Musik/Bilder → SimpleConverter. */
+    val folderVideo: String? = null,
+    val folderAudio: String? = null,
+    val folderImage: String? = null,
 ) {
+    fun folderFor(kind: MediaKind) = when (kind) {
+        MediaKind.VIDEO -> folderVideo
+        MediaKind.AUDIO -> folderAudio
+        MediaKind.IMAGE -> folderImage
+    }
+
+    fun withFolder(kind: MediaKind, folder: String?) = when (kind) {
+        MediaKind.VIDEO -> copy(folderVideo = folder)
+        MediaKind.AUDIO -> copy(folderAudio = folder)
+        MediaKind.IMAGE -> copy(folderImage = folder)
+    }
+
     fun defaultFor(kind: MediaKind) = when (kind) {
         MediaKind.VIDEO -> defaultVideo
         MediaKind.AUDIO -> defaultAudio
@@ -38,6 +54,9 @@ class SettingsStore private constructor(context: Context) {
             .putString(KEY_IMAGE, next.defaultImage.name)
             .putBoolean(KEY_KEEP_METADATA, next.keepMetadata)
             .putString(KEY_THEME, next.theme.name)
+            .putString(KEY_FOLDER_VIDEO, next.folderVideo)
+            .putString(KEY_FOLDER_AUDIO, next.folderAudio)
+            .putString(KEY_FOLDER_IMAGE, next.folderImage)
             .apply()
         _settings.value = next
     }
@@ -56,6 +75,9 @@ class SettingsStore private constructor(context: Context) {
             keepMetadata = prefs.getBoolean(KEY_KEEP_METADATA, defaults.keepMetadata),
             theme = prefs.getString(KEY_THEME, null)?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
                 ?: defaults.theme,
+            folderVideo = prefs.getString(KEY_FOLDER_VIDEO, null),
+            folderAudio = prefs.getString(KEY_FOLDER_AUDIO, null),
+            folderImage = prefs.getString(KEY_FOLDER_IMAGE, null),
         )
     }
 
@@ -65,6 +87,9 @@ class SettingsStore private constructor(context: Context) {
         private const val KEY_IMAGE = "defaultImage"
         private const val KEY_KEEP_METADATA = "keepMetadata"
         private const val KEY_THEME = "theme"
+        private const val KEY_FOLDER_VIDEO = "folderVideo"
+        private const val KEY_FOLDER_AUDIO = "folderAudio"
+        private const val KEY_FOLDER_IMAGE = "folderImage"
 
         @Volatile private var instance: SettingsStore? = null
 

@@ -150,7 +150,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
                     ImageConverter.convert(context, input, temp, settings)
             }
             val outputSize = temp.length()
-            val outputUri = OutputStore.save(context, temp, outputName, settings.format)
+            val outputUri = OutputStore.save(context, temp, outputName, settings.format, settings.outputFolder)
             RecentStore.add(
                 context,
                 RecentItem(file.name, outputName, outputUri, settings.format.mimeType, file.size, outputSize, System.currentTimeMillis()),
