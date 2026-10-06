@@ -80,7 +80,7 @@ Translations are welcome: copy `app/src/main/res/values/strings.xml` to `values-
 - **v0.2** ✅ Batch conversion, MP3/Opus/FLAC, WebM, H.265, HDR → SDR, “Save as”, keep camera details
 - **v0.3** ✅ English + German, settings, save location
 - **v0.4** Trim with preview, loudness normalization, history with search, widget
-- **v1.0** F-Droid and Play Store
+- **Maybe:** F-Droid and Play Store – not decided yet
 
 Details: [PLAN.md](PLAN.md) (German).
 

@@ -27,7 +27,7 @@ Ein Medienkonverter für Android, der **komplett offline** läuft:
 
 ---
 
-## 2. Funktionsumfang (Zielbild v1.0)
+## 2. Funktionsumfang (Zielbild)
 
 ### 🎬 Video
 - Eingabe: MP4, MKV, WebM, MOV, AVI, 3GP
@@ -227,7 +227,10 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 - [ ] **Quick Settings Tile** (optional)
 - [ ] Barrierefreiheit: TalkBack-Beschreibungen, Schriftgröße 200 %, Kontrast prüfen
 
-### v1.0 – Veröffentlichung (2–3 Wochen)
+### Vielleicht: Veröffentlichung auf F-Droid / Play Store (noch nicht entschieden)
+
+> Ob die App in F-Droid und den Play Store kommt, ist offen. Die Punkte unten sind eine Sammlung für den Fall, dass – kein fester Plan.
+
 
 - [ ] App-Name final prüfen (Markenrecherche „Simple Converter“ – evtl. eindeutiger Name)
 - [ ] Release-Signatur, `minifyEnabled` testen (R8-Regeln für JNI-Klassen)
