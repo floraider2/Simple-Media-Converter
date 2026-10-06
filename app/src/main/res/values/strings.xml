@@ -23,7 +23,7 @@
     <!-- Start -->
     <string name="home_question">What would you like to convert?</string>
     <string name="home_subtitle">Video, audio or image – everything stays on your device.</string>
-    <string name="home_pick_gallery">🖼️  Choose from gallery</string>
+    <string name="home_pick_gallery">Choose from gallery</string>
     <string name="home_pick_file">Search files (music too)</string>
     <string name="home_multiple_hint">Several files at once? Just select several.</string>
     <string name="home_share_tip">Tip: you can also share files from WhatsApp, your gallery or file manager straight to “Simple Converter”.</string>
@@ -229,4 +229,10 @@
     <string name="settings_thumbnails">Show thumbnails</string>
     <string name="settings_thumbnails_hint">Previews in the history and when converting. Off: icons only.</string>
     <string name="history_just_now">just now</string>
+
+    <!-- Barrierefreiheit (TalkBack) -->
+    <string name="a11y_expanded">expanded</string>
+    <string name="a11y_collapsed">collapsed</string>
+    <string name="a11y_expand">expand</string>
+    <string name="a11y_collapse">collapse</string>
 </resources>

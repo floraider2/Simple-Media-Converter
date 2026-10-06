@@ -32,6 +32,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -58,16 +67,24 @@ fun TrimSection(file: InputFile, settings: ConversionSettings, onTrim: (Long?, L
     val start = settings.trimStartMs ?: 0L
     val end = settings.trimEndMs ?: full
 
+    val expandedState = expandedText(expanded)
+    val rangeLabel = stringResource(R.string.trim_title)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded }
+                .clickable(
+                    onClickLabel = stringResource(if (expanded) R.string.a11y_collapse else R.string.a11y_expand),
+                ) { expanded = !expanded }
+                .semantics {
+                    role = Role.Button
+                    stateDescription = expandedState
+                }
                 .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.trim_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.trim_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
                 Text(
                     if (settings.isTrimmed) {
                         stringResource(R.string.trim_range, formatDuration(start), formatDuration(end), formatDuration(end - start))
@@ -121,7 +138,9 @@ fun TrimSection(file: InputFile, settings: ConversionSettings, onTrim: (Long?, L
                     },
                     valueRange = 0f..full.toFloat(),
                     // Die Griffe liegen nah am Rand: ohne das deutet Android das Ziehen als Zurück-Geste.
-                    modifier = Modifier.systemGestureExclusion(),
+                    modifier = Modifier
+                        .systemGestureExclusion()
+                        .semantics { contentDescription = rangeLabel },
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { onTrim(player.currentPosition.coerceAtMost(end - 1), settings.trimEndMs) }) {

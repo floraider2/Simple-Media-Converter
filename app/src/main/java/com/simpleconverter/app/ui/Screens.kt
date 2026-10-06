@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -72,7 +73,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -118,7 +127,14 @@ fun ConverterApp(vm: ConverterViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (screen is Screen.Home) stringResource(R.string.app_name) else titleFor(screen)) },
+                title = {
+                    // Lange Dateinamen oder große Schrift: eine Zeile mit „…“ statt abgeschnittener zweiter Zeile.
+                    Text(
+                        if (screen is Screen.Home) stringResource(R.string.app_name) else titleFor(screen),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 actions = {
                     if (screen is Screen.Home) {
                         IconButton(onClick = vm::openSettings) {
@@ -196,7 +212,7 @@ private fun HomeScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             ) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.home_question), style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.home_question), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
                     Text(
                         stringResource(R.string.home_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
@@ -206,7 +222,11 @@ private fun HomeScreen(
                             mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.home_pick_gallery)) }
+                    ) {
+                        Text("🖼️", modifier = Modifier.clearAndSetSemantics {})
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.home_pick_gallery))
+                    }
                     FilledTonalButton(
                         onClick = { documentPicker.launch(arrayOf("video/*", "audio/*", "image/*")) },
                         modifier = Modifier.fillMaxWidth(),
@@ -233,7 +253,11 @@ private fun HomeScreen(
         if (recents.isNotEmpty()) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Text(
+                        stringResource(R.string.home_recent),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f).semantics { heading() },
+                    )
                     TextButton(onClick = onClearRecents) { Text(stringResource(R.string.home_clear)) }
                 }
             }
@@ -256,6 +280,7 @@ private fun HomeScreen(
 @Composable
 private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modifier) {
     var advanced by rememberSaveable { mutableStateOf(false) }
+    val advancedState = expandedText(advanced)
     val presets = Presets.forFormat(s.format)
 
     // Der Knopf „Umwandeln“ bleibt unten fest stehen, nur die Einstellungen scrollen.
@@ -295,7 +320,7 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
         }
 
         Section(stringResource(R.string.setup_preset)) {
-            Column {
+            Column(Modifier.selectableGroup()) {
                 presets.forEach { preset ->
                     Row(
                         Modifier
@@ -336,11 +361,21 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable { advanced = !advanced }
+                    .clickable(
+                        onClickLabel = stringResource(if (advanced) R.string.a11y_collapse else R.string.a11y_expand),
+                    ) { advanced = !advanced }
+                    .semantics {
+                        role = Role.Button
+                        stateDescription = advancedState
+                    }
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.setup_advanced), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.setup_advanced),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
                 Icon(if (advanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null)
             }
             AnimatedVisibility(advanced) {
@@ -462,7 +497,9 @@ private fun AdvancedOptions(
                 ) { c -> update { it.copy(keepMetadata = c) } }
                 if (format != OutputFormat.PNG) {
                     Text(stringResource(R.string.adv_quality, settings.imageQuality), style = MaterialTheme.typography.labelLarge)
+                    val qualityLabel = stringResource(R.string.adv_quality, settings.imageQuality)
                     Slider(
+                        modifier = Modifier.semantics { contentDescription = qualityLabel },
                         value = settings.imageQuality.toFloat(),
                         onValueChange = { v -> update { it.copy(imageQuality = v.roundToInt()) } },
                         valueRange = 30f..100f,
@@ -551,7 +588,7 @@ private fun BatchHeader(files: List<InputFile>, onRemove: (InputFile) -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(emojiFor(files.first().kind), style = MaterialTheme.typography.headlineMedium)
+                Text(emojiFor(files.first().kind), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.clearAndSetSemantics {})
                 Spacer(Modifier.size(16.dp))
                 Column {
                     Text(pluralStringResource(R.plurals.n_files, files.size, files.size), style = MaterialTheme.typography.titleMedium)
@@ -589,7 +626,7 @@ private fun BatchHeader(files: List<InputFile>, onRemove: (InputFile) -> Unit) {
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
         content()
     }
 }
@@ -604,9 +641,13 @@ private fun WorkingScreen(s: Screen.Working, onCancel: () -> Unit, modifier: Mod
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val current = s.files.getOrElse(s.index) { s.files.first() }
-        Text(emojiFor(current.kind), style = MaterialTheme.typography.displayMedium)
+        Text(emojiFor(current.kind), style = MaterialTheme.typography.displayMedium, modifier = Modifier.clearAndSetSemantics {})
         if (s.files.size > 1) {
-            Text(stringResource(R.string.working_file_n, s.index + 1, s.files.size), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.working_file_n, s.index + 1, s.files.size),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
         }
         Text("${current.name} → ${s.format.label}", textAlign = TextAlign.Center)
         if (s.preparing) {
@@ -804,3 +845,7 @@ internal fun openOutput(context: Context, uri: Uri, mime: String) {
         Toast.makeText(context, R.string.file_gone, Toast.LENGTH_SHORT).show()
     }
 }
+
+/** Für TalkBack: „aufgeklappt“ / „zugeklappt“. */
+@Composable
+internal fun expandedText(expanded: Boolean) = stringResource(if (expanded) R.string.a11y_expanded else R.string.a11y_collapsed)
