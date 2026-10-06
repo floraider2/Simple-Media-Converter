@@ -141,7 +141,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
             }
             onProgress(0)
             when (settings.format) {
-                OutputFormat.MP4, OutputFormat.M4A ->
+                OutputFormat.MP4, OutputFormat.WEBM, OutputFormat.M4A ->
                     VideoConverter.convert(context, input, temp, settings, file.durationMs, onProgress)
                 OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV ->
                     AudioConverter.convert(context, input, temp, settings, onProgress)

@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.simpleconverter.app.convert.OutputStore
 import com.simpleconverter.app.data.FileInspector
 import com.simpleconverter.app.data.RecentStore
 import com.simpleconverter.app.model.ConversionSettings
@@ -195,6 +196,28 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             else -> return
         }
         _screen.value = setupFor(files, commonTargets(files).first())
+    }
+
+    /** „Speichern unter …“ für ein Ergebnis. */
+    fun saveCopy(result: FileResult, target: Uri) {
+        val from = result.outputUri ?: return
+        viewModelScope.launch {
+            _message.value = withContext(Dispatchers.IO) {
+                runCatching { OutputStore.copy(getApplication(), from, target) }
+                    .fold({ "Gespeichert." }, { "Speichern fehlgeschlagen." })
+            }
+        }
+    }
+
+    /** Alle erfolgreichen Ergebnisse in einen Ordner kopieren. */
+    fun saveAllTo(results: List<FileResult>, tree: Uri) {
+        val files = results.filter { it.ok }.map { Triple(it.outputUri!!, it.outputName!!, it.mimeType) }
+        viewModelScope.launch {
+            val copied = withContext(Dispatchers.IO) {
+                runCatching { OutputStore.copyToFolder(getApplication(), tree, files) }.getOrDefault(0)
+            }
+            _message.value = if (copied == files.size) "$copied Dateien gespeichert." else "$copied von ${files.size} Dateien gespeichert."
+        }
     }
 
     fun clearRecents() {

@@ -6,13 +6,14 @@ Offline-Medienkonverter für Android. Keine Werbung, keine Cloud, keine Anmeldun
 
 | Eingabe | Ziel | Engine |
 |---|---|---|
-| 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264/AAC), Auflösung, Bitrate, Zielgröße, Ton entfernen | Media3 Transformer (Hardware) |
+| 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264 oder H.265 + AAC), Auflösung, Bitrate, Zielgröße, Ton entfernen; HDR wird nach SDR umgerechnet | Media3 Transformer (Hardware) |
+| 🎬 Video | WebM (VP9 + Opus, ab Android 10) | Media3 Transformer + MediaMuxer |
 | 🎬 Video / 🎵 Audio | MP3 (32–320 kbit/s) | LAME 3.100 (nativ, im Repo) |
 | 🎬 Video / 🎵 Audio | M4A (AAC) mit wählbarer Bitrate | Media3 Transformer |
 | 🎬 Video / 🎵 Audio | Opus in OGG (ab Android 10) | MediaCodec + MediaMuxer |
 | 🎬 Video / 🎵 Audio | FLAC (verlustfrei) | MediaCodec |
 | 🎬 Video / 🎵 Audio | WAV (16-Bit-PCM) | MediaCodec |
-| 🖼️ Bild (JPG, PNG, WebP, HEIC, AVIF*) | JPG, PNG, WebP, Skalieren, Qualität, EXIF wird entfernt | ImageDecoder / Bitmap.compress |
+| 🖼️ Bild (JPG, PNG, WebP, HEIC, AVIF*) | JPG, PNG, WebP, Skalieren, Qualität; EXIF wird entfernt, auf Wunsch bleiben Kameradaten (nie der Standort) | ImageDecoder / Bitmap.compress |
 
 \* HEIC ab Android 9, AVIF ab Android 12, sofern das Gerät es dekodiert.
 
@@ -21,6 +22,8 @@ Offline-Medienkonverter für Android. Keine Werbung, keine Cloud, keine Anmeldun
 **Dateien öffnen:** in der App über die Galerie (Photo Picker) oder „Datei suchen“ (Systemdateiauswahl, auch für Musik), oder von außen über **Teilen an** / **Öffnen mit**.
 
 **Vorgaben:** Für WhatsApp · Für E-Mail (< 25 MB) · Kleinste Datei · Max. Qualität. Unter „Erweitert“ gibt es Auflösung, Zielgröße, Bitrate und Qualität.
+
+Ergebnisse lassen sich teilen, öffnen oder per **„Speichern unter …“** an einen beliebigen Ort kopieren.
 
 Die Umwandlung läuft in WorkManager mit einem Foreground Service und zeigt den Fortschritt in der Benachrichtigung. Ergebnisse landen in `Movies/`, `Music/` oder `Pictures/SimpleConverter`. Unter Android 8 und 9 liegen sie im App-Ordner.
 
@@ -32,7 +35,7 @@ Benötigt JDK 17 und das Android SDK (Plattform 35) mit NDK 27.2 und CMake 3.22.
 ./gradlew assembleDebug
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`
+APK: `app/build/outputs/apk/debug/app-debug.apk` – installiert sich als **„Simple Converter Debug“** (`com.simpleconverter.app.debug`) neben einer offiziellen Version.
 
 Tests:
 
@@ -66,6 +69,6 @@ app/src/main/cpp/            JNI-Brücke + LAME-Quellcode
 
 ## Fahrplan
 
-- **v0.2:** ~~Stapelverarbeitung~~ ✅, ~~MP3/Opus/FLAC~~ ✅, WebM-Video offen
+- **v0.2:** ✅ Stapelverarbeitung, MP3/Opus/FLAC, WebM, H.265, HDR→SDR, „Speichern unter“, Kameradaten behalten
 - **v0.3:** Kürzen mit Vorschau, Lautstärke angleichen, Widget
 - **v1.0:** F-Droid und Play Store, Open Source

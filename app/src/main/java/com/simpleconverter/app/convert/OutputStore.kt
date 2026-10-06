@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
@@ -53,6 +54,27 @@ object OutputStore {
      * Android 8/9: ohne Speicherberechtigung landet die Datei im App-Ordner
      * (Android/data/…). Über Teilen/Öffnen ist sie trotzdem erreichbar.
      */
+    /** „Speichern unter …“: Ergebnis an einen vom Nutzer gewählten Ort kopieren. */
+    fun copy(context: Context, from: Uri, to: Uri) {
+        val resolver = context.contentResolver
+        resolver.openInputStream(from)?.use { input ->
+            resolver.openOutputStream(to, "w")?.use { input.copyTo(it) }
+                ?: throw ConversionException("Ziel konnte nicht geschrieben werden.")
+        } ?: throw ConversionException("Die Datei ist nicht mehr verfügbar.")
+    }
+
+    /** Mehrere Ergebnisse in einen vom Nutzer gewählten Ordner kopieren. Gibt die Anzahl zurück. */
+    fun copyToFolder(context: Context, tree: Uri, files: List<Triple<Uri, String, String>>): Int {
+        val resolver = context.contentResolver
+        val folder = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        var copied = 0
+        for ((from, name, mime) in files) {
+            val target = DocumentsContract.createDocument(resolver, folder, mime, name) ?: continue
+            runCatching { copy(context, from, target) }.onSuccess { copied++ }
+        }
+        return copied
+    }
+
     private fun saveToAppFolder(context: Context, file: File, displayName: String, format: OutputFormat): Uri {
         val type = when (format.kind) {
             MediaKind.VIDEO -> Environment.DIRECTORY_MOVIES

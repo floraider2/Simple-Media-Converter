@@ -21,6 +21,7 @@ import kotlin.math.roundToInt
 /**
  * Bilder über die Bord-APIs des Systems. Beim Neu-Kodieren gehen EXIF-Daten
  * (GPS, Kamera, Zeitstempel) automatisch verloren – gewollt für den Datenschutz.
+ * Auf Wunsch werden Kameradaten zurückkopiert, der Standort aber nie.
  */
 object ImageConverter {
 
@@ -40,7 +41,38 @@ object ImageConverter {
             } finally {
                 bitmap.recycle()
             }
+            if (settings.keepMetadata) copyMetadata(context, input, output)
         }
+
+    /** Kopiert unbedenkliche EXIF-Felder. GPS-Felder stehen absichtlich nicht in der Liste. */
+    private fun copyMetadata(context: Context, input: Uri, output: File) {
+        runCatching {
+            val source = context.contentResolver.openInputStream(input)?.use { ExifInterface(it) } ?: return
+            val target = ExifInterface(output.absolutePath)
+            var copied = 0
+            for (tag in KEPT_TAGS) {
+                source.getAttribute(tag)?.let {
+                    target.setAttribute(tag, it)
+                    copied++
+                }
+            }
+            if (copied == 0) return
+            // Das Bild ist schon richtig gedreht.
+            target.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+            target.saveAttributes()
+        }
+    }
+
+    private val KEPT_TAGS = listOf(
+        ExifInterface.TAG_DATETIME, ExifInterface.TAG_DATETIME_ORIGINAL, ExifInterface.TAG_DATETIME_DIGITIZED,
+        ExifInterface.TAG_OFFSET_TIME, ExifInterface.TAG_OFFSET_TIME_ORIGINAL, ExifInterface.TAG_OFFSET_TIME_DIGITIZED,
+        ExifInterface.TAG_SUBSEC_TIME_ORIGINAL,
+        ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL, ExifInterface.TAG_LENS_MAKE, ExifInterface.TAG_LENS_MODEL,
+        ExifInterface.TAG_EXPOSURE_TIME, ExifInterface.TAG_F_NUMBER, ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
+        ExifInterface.TAG_FOCAL_LENGTH, ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM, ExifInterface.TAG_FLASH,
+        ExifInterface.TAG_WHITE_BALANCE, ExifInterface.TAG_EXPOSURE_BIAS_VALUE, ExifInterface.TAG_METERING_MODE,
+        ExifInterface.TAG_ARTIST, ExifInterface.TAG_COPYRIGHT, ExifInterface.TAG_IMAGE_DESCRIPTION,
+    )
 
     private fun decode(context: Context, input: Uri, maxSide: Int?): Bitmap =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
