@@ -4,7 +4,7 @@ Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests 
 
 **Aktueller Schwerpunkt:** v0.2 – Stapelverarbeitung und MP3/Opus/FLAC sind fertig. Offen: WebM-Video, H.265, HDR.
 
-Repo: https://github.com/floraider2/Simple-Media-Converter · Arbeits-Branch: `media3-v0.1`
+Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
 ---
 
@@ -368,7 +368,7 @@ Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Enco
 ## 10. Offene Fragen
 
 1. ~~Git-Identität~~ → `floraider2` mit der anonymen GitHub-Adresse (noreply)
-2. ~~Remote~~ → GitHub `floraider2/Simple-Media-Converter`, öffentlich. Einziger und Standard-Branch: `media3-v0.1`.
+2. ~~Remote~~ → GitHub `floraider2/Simple-Media-Converter`, öffentlich. Standard-Branch `main`, Versionen als Tags (`v0.1.0` …), größere Funktionen in kurzlebigen Arbeits-Branches mit Pull Request.
 3. **Paketname**: `com.simpleconverter.app` ist ein Platzhalter – eigene Domain/Name gewünscht? (Muss vor dem ersten Store-Release feststehen, danach nicht mehr änderbar.)
 4. ~~App-Lizenz~~ → **GPL-3.0** (Vorschlag aus Abschnitt 9, LICENSE liegt im Repo). (LAME ist LGPL und als eigene .so eingebunden – passt zu beiden.)
 5. **Sprache**: Englisch ab v0.3 genug, oder weitere Sprachen?
