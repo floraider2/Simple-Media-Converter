@@ -57,6 +57,8 @@ object JobStore {
             .put("hevc", st.hevc)
             .put("keepMetadata", st.keepMetadata)
             .put("outputFolder", st.outputFolder ?: "")
+            .put("trimStartMs", st.trimStartMs ?: -1L)
+            .put("trimEndMs", st.trimEndMs ?: -1L)
         write(file(context, job.id, ""), JSONObject().put("files", files).put("settings", settings))
     }
 
@@ -88,6 +90,8 @@ object JobStore {
             hevc = s.optBoolean("hevc", false),
             keepMetadata = s.optBoolean("keepMetadata", false),
             outputFolder = s.optString("outputFolder").takeIf { it.isNotEmpty() },
+            trimStartMs = s.optLong("trimStartMs", -1L).takeIf { it >= 0 },
+            trimEndMs = s.optLong("trimEndMs", -1L).takeIf { it >= 0 },
         )
         Job(id, files, settings)
     }.getOrNull()

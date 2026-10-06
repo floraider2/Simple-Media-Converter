@@ -76,7 +76,24 @@ data class ConversionSettings(
     val keepMetadata: Boolean = false,
     /** Zielordner (Tree-URI aus der Ordnerauswahl); null = Standardordner (Filme/Musik/Bilder). */
     val outputFolder: String? = null,
+    /** Kürzen (Video/Audio): Anfang und Ende in ms; null = vom Anfang bzw. bis zum Ende. */
+    val trimStartMs: Long? = null,
+    val trimEndMs: Long? = null,
 ) {
+    val isTrimmed get() = trimStartMs != null || trimEndMs != null
+
+    /** Länge nach dem Kürzen; null, wenn die volle Länge unbekannt ist. */
+    fun trimmedDurationMs(fullMs: Long?): Long? {
+        if (fullMs == null) return null
+        val end = (trimEndMs ?: fullMs).coerceAtMost(fullMs)
+        val start = (trimStartMs ?: 0L).coerceIn(0L, end)
+        return end - start
+    }
+
+    /** Was der Nutzer unabhängig von der Vorgabe gewählt hat, auf andere Einstellungen übertragen. */
+    fun withUserChoicesFrom(other: ConversionSettings) =
+        copy(keepMetadata = other.keepMetadata, trimStartMs = other.trimStartMs, trimEndMs = other.trimEndMs)
+
     fun toData(): Data = workDataOf(
         "format" to format.name,
         "videoShortSide" to (videoShortSide ?: 0),
@@ -89,6 +106,8 @@ data class ConversionSettings(
         "hevc" to hevc,
         "keepMetadata" to keepMetadata,
         "outputFolder" to outputFolder,
+        "trimStartMs" to (trimStartMs ?: -1L),
+        "trimEndMs" to (trimEndMs ?: -1L),
     )
 
     companion object {
@@ -104,6 +123,8 @@ data class ConversionSettings(
             hevc = d.getBoolean("hevc", false),
             keepMetadata = d.getBoolean("keepMetadata", false),
             outputFolder = d.getString("outputFolder"),
+            trimStartMs = d.getLong("trimStartMs", -1L).takeIf { it >= 0 },
+            trimEndMs = d.getLong("trimEndMs", -1L).takeIf { it >= 0 },
         )
     }
 }

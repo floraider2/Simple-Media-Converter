@@ -56,7 +56,20 @@ object VideoConverter {
 
         val probe = probe(context, input)
         val effects = if (audioOnly) Effects.EMPTY else videoEffects(probe, settings.videoShortSide)
-        val edited = EditedMediaItem.Builder(MediaItem.fromUri(input))
+        val mediaItem = MediaItem.Builder()
+            .setUri(input)
+            .apply {
+                if (settings.isTrimmed) {
+                    setClippingConfiguration(
+                        MediaItem.ClippingConfiguration.Builder()
+                            .setStartPositionMs(settings.trimStartMs ?: 0L)
+                            .apply { settings.trimEndMs?.let { setEndPositionMs(it) } }
+                            .build()
+                    )
+                }
+            }
+            .build()
+        val edited = EditedMediaItem.Builder(mediaItem)
             .setRemoveVideo(audioOnly)
             .setRemoveAudio(removeAudio)
             .setEffects(effects)
@@ -72,7 +85,8 @@ object VideoConverter {
         }
 
         // Nie mehr Bitrate als das Original – sonst wird die Datei beim „Verkleinern“ größer.
-        val videoBitrate = (targetVideoBitrate(settings, durationMs, removeAudio) ?: settings.videoBitrate)
+        // Zielgröße bezieht sich auf die gekürzte Länge.
+        val videoBitrate = (targetVideoBitrate(settings, settings.trimmedDurationMs(durationMs), removeAudio) ?: settings.videoBitrate)
             ?.let { Bitrate.capToSource(it, probe?.bitrate) }
         val encoderFactory = DefaultEncoderFactory.Builder(context.applicationContext)
             .setEnableFallback(true)

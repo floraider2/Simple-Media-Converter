@@ -148,7 +148,20 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
     fun selectFormat(format: OutputFormat) {
         val current = _screen.value as? Screen.Setup ?: return
         // Ein für diese Umwandlung gewählter Ordner bleibt beim Formatwechsel erhalten.
-        _screen.value = setupFor(current.files, format).copy(customFolder = current.customFolder)
+        val next = setupFor(current.files, format)
+        _screen.value = next.copy(
+            customFolder = current.customFolder,
+            settings = next.settings.withUserChoicesFrom(current.settings),
+        )
+    }
+
+    /** Ausschnitt setzen (null = vom Anfang / bis zum Ende). */
+    fun setTrim(startMs: Long?, endMs: Long?) {
+        val current = _screen.value as? Screen.Setup ?: return
+        val full = current.files.singleOrNull()?.durationMs ?: return
+        val start = startMs?.coerceIn(0L, full)?.takeIf { it > 0 }
+        val end = endMs?.coerceIn(0L, full)?.takeIf { it < full }
+        _screen.value = current.copy(settings = current.settings.copy(trimStartMs = start, trimEndMs = end))
     }
 
     /** Ordner nur für diese Umwandlung (null = zurück zum Standard). */
@@ -176,7 +189,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
     fun selectPreset(id: String) {
         val current = _screen.value as? Screen.Setup ?: return
         val preset = Presets.forFormat(current.format).firstOrNull { it.id == id } ?: return
-        _screen.value = current.copy(presetId = id, settings = preset.settings.copy(keepMetadata = current.settings.keepMetadata))
+        _screen.value = current.copy(presetId = id, settings = preset.settings.withUserChoicesFrom(current.settings))
     }
 
     /** Änderung unter „Erweitert“ – macht aus der Vorgabe eigene Einstellungen. */
@@ -185,7 +198,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         val updated = transform(current.settings)
         // „Kameradaten behalten“ ist unabhängig von der Vorgabe.
         val matching = Presets.forFormat(current.format)
-            .firstOrNull { it.settings.copy(keepMetadata = updated.keepMetadata) == updated }
+            .firstOrNull { it.settings.withUserChoicesFrom(updated) == updated }
         _screen.value = current.copy(settings = updated, presetId = matching?.id)
     }
 
