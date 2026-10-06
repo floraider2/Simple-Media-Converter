@@ -1,8 +1,10 @@
 package com.simpleconverter.app.model
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.work.Data
 import androidx.work.workDataOf
+import com.simpleconverter.app.R
 
 enum class MediaKind { VIDEO, AUDIO, IMAGE }
 
@@ -102,77 +104,82 @@ data class ConversionSettings(
     }
 }
 
-/** Eine Vorgabe in Alltagssprache statt Fachbegriffen. */
-data class Preset(val id: String, val label: String, val description: String, val settings: ConversionSettings)
+/**
+ * Eine Vorgabe in Alltagssprache statt Fachbegriffen.
+ * Texte kommen aus den Ressourcen; [descriptionArg] füllt z. B. „%d kbit/s“.
+ */
+data class Preset(
+    val id: String,
+    @StringRes val label: Int,
+    @StringRes val description: Int,
+    val settings: ConversionSettings,
+    val descriptionArg: Int? = null,
+)
 
 object Presets {
     private const val MB = 1024L * 1024L
 
+    private fun kbits(id: String, @StringRes label: Int, format: OutputFormat, kbit: Int) =
+        Preset(id, label, R.string.kbits, ConversionSettings(format, audioBitrate = kbit * 1000), descriptionArg = kbit)
+
     fun forFormat(format: OutputFormat): List<Preset> = when (format) {
         OutputFormat.MP4 -> listOf(
-            Preset("whatsapp", "Für WhatsApp", "720p, gute Qualität, kleine Datei",
+            Preset("whatsapp", R.string.preset_whatsapp, R.string.preset_whatsapp_desc,
                 ConversionSettings(format, videoShortSide = 720, videoBitrate = 2_000_000, audioBitrate = 128_000)),
-            Preset("email", "Für E-Mail", "Passt unter 25 MB",
+            Preset("email", R.string.preset_email, R.string.preset_email_desc,
                 ConversionSettings(format, videoShortSide = 720, targetSizeBytes = 24 * MB, audioBitrate = 96_000)),
-            Preset("smallest", "Kleinste Datei", "480p, niedrige Bitrate",
+            Preset("smallest", R.string.preset_smallest, R.string.preset_480p_desc,
                 ConversionSettings(format, videoShortSide = 480, videoBitrate = 700_000, audioBitrate = 96_000)),
-            Preset("max", "Max. Qualität", "Originalauflösung",
+            Preset("max", R.string.preset_max, R.string.preset_original_resolution,
                 ConversionSettings(format, videoBitrate = 12_000_000, audioBitrate = 192_000)),
         )
         OutputFormat.WEBM -> listOf(
-            Preset("standard", "Standard", "720p, VP9 – gut fürs Web",
+            Preset("standard", R.string.preset_standard, R.string.preset_webm_desc,
                 ConversionSettings(format, videoShortSide = 720, videoBitrate = 1_500_000, audioBitrate = 96_000)),
-            Preset("smallest", "Kleinste Datei", "480p, niedrige Bitrate",
+            Preset("smallest", R.string.preset_smallest, R.string.preset_480p_desc,
                 ConversionSettings(format, videoShortSide = 480, videoBitrate = 500_000, audioBitrate = 64_000)),
-            Preset("max", "Max. Qualität", "Originalauflösung",
+            Preset("max", R.string.preset_max, R.string.preset_original_resolution,
                 ConversionSettings(format, videoBitrate = 8_000_000, audioBitrate = 128_000)),
         )
         OutputFormat.MP3 -> listOf(
-            Preset("standard", "Standard", "192 kbit/s, passt überall",
+            Preset("standard", R.string.preset_standard, R.string.preset_mp3_standard_desc,
                 ConversionSettings(format, audioBitrate = 192_000)),
-            Preset("high", "Hohe Qualität", "320 kbit/s",
-                ConversionSettings(format, audioBitrate = 320_000)),
-            Preset("small", "Kleine Datei", "128 kbit/s",
-                ConversionSettings(format, audioBitrate = 128_000)),
+            kbits("high", R.string.preset_high, format, 320),
+            kbits("small", R.string.preset_small, format, 128),
         )
         OutputFormat.OPUS -> listOf(
-            Preset("standard", "Standard", "128 kbit/s, klingt wie MP3 mit 192",
+            Preset("standard", R.string.preset_standard, R.string.preset_opus_standard_desc,
                 ConversionSettings(format, audioBitrate = 128_000)),
-            Preset("high", "Hohe Qualität", "192 kbit/s",
-                ConversionSettings(format, audioBitrate = 192_000)),
-            Preset("speech", "Sprache", "32 kbit/s, ideal für Sprachnachrichten und Hörbücher",
+            kbits("high", R.string.preset_high, format, 192),
+            Preset("speech", R.string.preset_speech, R.string.preset_speech_desc,
                 ConversionSettings(format, audioBitrate = 32_000)),
         )
         OutputFormat.FLAC -> listOf(
-            Preset("lossless", "Verlustfrei", "Etwa halb so groß wie WAV",
-                ConversionSettings(format)),
+            Preset("lossless", R.string.preset_lossless, R.string.preset_flac_desc, ConversionSettings(format)),
         )
         OutputFormat.M4A -> listOf(
-            Preset("standard", "Standard", "192 kbit/s",
-                ConversionSettings(format, audioBitrate = 192_000)),
-            Preset("high", "Hohe Qualität", "256 kbit/s",
-                ConversionSettings(format, audioBitrate = 256_000)),
-            Preset("small", "Kleine Datei", "96 kbit/s, gut für Sprache",
+            kbits("standard", R.string.preset_standard, format, 192),
+            kbits("high", R.string.preset_high, format, 256),
+            Preset("small", R.string.preset_small, R.string.preset_m4a_small_desc,
                 ConversionSettings(format, audioBitrate = 96_000)),
         )
         OutputFormat.WAV -> listOf(
-            Preset("lossless", "Verlustfrei", "Unkomprimiertes PCM, große Datei",
-                ConversionSettings(format)),
+            Preset("lossless", R.string.preset_lossless, R.string.preset_wav_desc, ConversionSettings(format)),
         )
         OutputFormat.JPG, OutputFormat.WEBP -> listOf(
-            Preset("standard", "Standard", "Originalgröße, Qualität 90",
+            Preset("standard", R.string.preset_standard, R.string.preset_image_standard_desc,
                 ConversionSettings(format, imageQuality = 90)),
-            Preset("messenger", "Für Messenger", "Max. 1600 px, Qualität 80",
+            Preset("messenger", R.string.preset_messenger, R.string.preset_image_messenger_desc,
                 ConversionSettings(format, imageMaxSide = 1600, imageQuality = 80)),
-            Preset("smallest", "Kleinste Datei", "Max. 1280 px, Qualität 65",
+            Preset("smallest", R.string.preset_smallest, R.string.preset_image_smallest_desc,
                 ConversionSettings(format, imageMaxSide = 1280, imageQuality = 65)),
-            Preset("max", "Max. Qualität", "Originalgröße, Qualität 100",
+            Preset("max", R.string.preset_max, R.string.preset_image_max_desc,
                 ConversionSettings(format, imageQuality = 100)),
         )
         OutputFormat.PNG -> listOf(
-            Preset("standard", "Originalgröße", "Verlustfrei",
+            Preset("standard", R.string.preset_original_size, R.string.preset_lossless,
                 ConversionSettings(format)),
-            Preset("messenger", "Verkleinert", "Max. 1600 px, verlustfrei",
+            Preset("messenger", R.string.preset_downscaled, R.string.preset_png_downscaled_desc,
                 ConversionSettings(format, imageMaxSide = 1600)),
         )
     }
@@ -190,7 +197,7 @@ data class RecentItem(
 
 /** Dateiname des Ergebnisses: gleicher Name, neue Endung. */
 fun outputFileName(inputName: String, format: OutputFormat): String {
-    val base = inputName.substringBeforeLast('.', inputName).trim().trimStart('.').ifBlank { "umgewandelt" }
+    val base = inputName.substringBeforeLast('.', inputName).trim().trimStart('.').ifBlank { "converted" }
     return "$base.${format.extension}"
 }
 

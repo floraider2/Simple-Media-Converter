@@ -1,3 +1,178 @@
-<resources>
-    <string name="share_label">Umwandeln</string>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Englisch ist die Grundsprache; Übersetzungen in values-<sprache>/strings.xml. -->
+    <string name="share_label">Convert</string>
+
+    <!-- Allgemein -->
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="share">Share</string>
+    <string name="open">Open</string>
+    <string name="original">Original</string>
+    <string name="off">Off</string>
+    <string name="default_file_name">converted</string>
+    <plurals name="n_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+
+    <!-- Titel -->
+    <string name="title_working">Converting …</string>
+    <string name="title_done">Done</string>
+    <string name="title_error">Error</string>
+
+    <!-- Start -->
+    <string name="home_question">What would you like to convert?</string>
+    <string name="home_subtitle">Video, audio or image – everything stays on your device.</string>
+    <string name="home_pick_gallery">🖼️  Choose from gallery</string>
+    <string name="home_pick_file">Search files (music too)</string>
+    <string name="home_multiple_hint">Several files at once? Just select several.</string>
+    <string name="home_share_tip">Tip: you can also share files from WhatsApp, your gallery or file manager straight to “Simple Converter”.</string>
+    <string name="home_recent">Recent</string>
+    <string name="home_clear">Clear</string>
+
+    <!-- Einstellungen -->
+    <string name="setup_no_audio_single">This video has no audio track.</string>
+    <string name="setup_no_audio_batch">At least one video has no audio track, so “Audio only” isn’t available.</string>
+    <string name="setup_target_format">Output format</string>
+    <string name="setup_audio_only">Audio only: %s</string>
+    <string name="setup_preset">Preset</string>
+    <string name="setup_custom">Custom settings</string>
+    <string name="setup_advanced">Advanced</string>
+    <string name="setup_privacy_keep">🔒 The location is removed, camera details are kept.</string>
+    <string name="setup_privacy_strip">🔒 Location, camera details and other EXIF info are removed when converting.</string>
+    <string name="setup_convert">Convert</string>
+    <plurals name="setup_convert_n">
+        <item quantity="one">Convert %d file</item>
+        <item quantity="other">Convert %d files</item>
+    </plurals>
+
+    <!-- Erweitert -->
+    <string name="adv_codec">Codec</string>
+    <string name="adv_h264">H.264 (plays everywhere)</string>
+    <string name="adv_h265">H.265 (smaller)</string>
+    <string name="adv_resolution">Resolution</string>
+    <string name="adv_target_size">Target size</string>
+    <string name="adv_video_bitrate">Video bitrate</string>
+    <string name="adv_mbit_0_7">0.7 Mbit/s</string>
+    <string name="adv_remove_audio">Remove audio</string>
+    <string name="adv_audio_bitrate">Audio bitrate</string>
+    <string name="adv_max_size">Maximum size (longest side)</string>
+    <string name="adv_keep_metadata">Keep camera details</string>
+    <string name="adv_keep_metadata_hint">Capture time, camera, exposure – the location is still removed</string>
+    <string name="adv_quality">Quality: %d</string>
+
+    <!-- Stapel -->
+    <string name="batch_total">%s in total</string>
+    <string name="batch_remove">Remove %s</string>
+    <string name="batch_show_less">Show less</string>
+    <string name="batch_show_all">Show all %d</string>
+
+    <!-- Fortschritt -->
+    <string name="working_file_n">File %1$d of %2$d</string>
+    <string name="working_preparing">Preparing file …</string>
+    <string name="working_leave_hint">You can leave the app – progress is shown in the notification.</string>
+
+    <!-- Ergebnis -->
+    <string name="done_bigger_hint">The new file is larger than the original – the original was already heavily compressed. For a smaller file, try “Smallest file” or another format.</string>
+    <string name="save_as">Save as …</string>
+    <string name="another_file">Another file</string>
+    <plurals name="done_all">
+        <item quantity="one">%d file done</item>
+        <item quantity="other">%d files done</item>
+    </plurals>
+    <string name="done_some" tools:ignore="PluralsCandidate">%1$d of %2$d files done</string>
+    <string name="share_all">Share all</string>
+    <string name="save_all">Save all to folder …</string>
+    <string name="cd_done">done</string>
+    <string name="cd_failed">failed</string>
+    <string name="failed_title">That didn’t work.</string>
+    <string name="failed_retry">Try other settings</string>
+    <string name="to_start">Back to start</string>
+    <string name="no_app_to_open">No app found to open this file.</string>
+    <string name="file_gone">The file is no longer available.</string>
+
+    <!-- Meldungen -->
+    <string name="msg_already_running">A conversion is already running.</string>
+    <string name="msg_not_media_single">This file isn’t a video, audio or image.</string>
+    <string name="msg_not_media_all">None of the files is a video, audio or image.</string>
+    <string name="msg_mixed_kinds">Images can’t be converted together with videos or music. Please select them separately.</string>
+    <plurals name="msg_skipped">
+        <item quantity="one">%d file skipped – not a video, audio or image.</item>
+        <item quantity="other">%d files skipped – not a video, audio or image.</item>
+    </plurals>
+    <string name="msg_saved">Saved.</string>
+    <string name="msg_save_failed">Saving failed.</string>
+    <plurals name="msg_saved_n">
+        <item quantity="one">%d file saved.</item>
+        <item quantity="other">%d files saved.</item>
+    </plurals>
+    <string name="msg_saved_some" tools:ignore="PluralsCandidate">%1$d of %2$d files saved.</string>
+    <string name="msg_cancelled">Conversion cancelled.</string>
+    <plurals name="msg_cancelled_some_done">
+        <item quantity="one">Cancelled – %d file was already done.</item>
+        <item quantity="other">Cancelled – %d files were already done.</item>
+    </plurals>
+
+    <!-- Benachrichtigungen -->
+    <string name="channel_progress">Conversion running</string>
+    <string name="channel_result">Conversion finished</string>
+    <string name="notif_file_n">File %1$d of %2$d: %3$s</string>
+    <string name="notif_preparing">Preparing file … %d %%</string>
+    <string name="notif_done">Done: %s</string>
+    <string name="notif_failed">Failed: %s</string>
+    <string name="notif_failed_count" tools:ignore="PluralsCandidate">%1$d failed · %2$s</string>
+
+    <!-- Fehler -->
+    <string name="err_unknown">Unknown error</string>
+    <string name="err_job_missing">Job not found.</string>
+    <string name="err_out_of_memory">The file is too large for the available memory. Choose a smaller size under “Advanced”.</string>
+    <string name="err_no_space">Not enough storage space.</string>
+    <string name="err_file_unreachable">The file can no longer be read. Please select it again.</string>
+    <string name="err_image_unsupported">Your device can’t read this image format.</string>
+    <string name="err_unexpected">Unexpected error (%s). Try other settings.</string>
+    <string name="err_cannot_read_format">Your device can’t read this format.</string>
+    <string name="err_cannot_encode">Your device can’t save with these settings. Try a lower resolution.</string>
+    <string name="err_cannot_write_output">The output file couldn’t be written.</string>
+    <string name="err_export_failed">Conversion failed (%s).</string>
+    <string name="err_image_save">The image couldn’t be saved.</string>
+    <string name="err_save_failed">Saving failed.</string>
+    <string name="err_target_unwritable">The destination couldn’t be written.</string>
+    <string name="err_opus_needs_android10">Opus requires Android 10 or newer.</string>
+    <string name="err_mp3_start">The MP3 encoder couldn’t be started.</string>
+    <string name="err_mp3_encode">MP3 encoding failed (%d).</string>
+    <string name="err_no_audio_track">The file has no audio track.</string>
+    <string name="err_empty_audio_track">The audio track is empty.</string>
+    <string name="err_audio_encoder_missing">Your device can’t create this audio format.</string>
+    <string name="err_flac_header">The FLAC encoder didn’t produce a file header.</string>
+
+    <!-- Vorgaben -->
+    <string name="preset_whatsapp">For WhatsApp</string>
+    <string name="preset_whatsapp_desc">720p, good quality, small file</string>
+    <string name="preset_email">For email</string>
+    <string name="preset_email_desc">Fits under 25 MB</string>
+    <string name="preset_smallest">Smallest file</string>
+    <string name="preset_480p_desc">480p, low bitrate</string>
+    <string name="preset_max">Max. quality</string>
+    <string name="preset_original_resolution">Original resolution</string>
+    <string name="preset_standard">Standard</string>
+    <string name="preset_webm_desc">720p, VP9 – great for the web</string>
+    <string name="preset_high">High quality</string>
+    <string name="preset_small">Small file</string>
+    <string name="preset_mp3_standard_desc">192 kbit/s, plays everywhere</string>
+    <string name="preset_opus_standard_desc">128 kbit/s, sounds like MP3 at 192</string>
+    <string name="preset_speech">Speech</string>
+    <string name="preset_speech_desc">32 kbit/s, ideal for voice messages and audiobooks</string>
+    <string name="preset_lossless">Lossless</string>
+    <string name="preset_flac_desc">About half the size of WAV</string>
+    <string name="preset_m4a_small_desc">96 kbit/s, good for speech</string>
+    <string name="preset_wav_desc">Uncompressed PCM, large file</string>
+    <string name="preset_image_standard_desc">Original size, quality 90</string>
+    <string name="preset_messenger">For messengers</string>
+    <string name="preset_image_messenger_desc">Max. 1600 px, quality 80</string>
+    <string name="preset_image_smallest_desc">Max. 1280 px, quality 65</string>
+    <string name="preset_image_max_desc">Original size, quality 100</string>
+    <string name="preset_original_size">Original size</string>
+    <string name="preset_downscaled">Downscaled</string>
+    <string name="preset_png_downscaled_desc">Max. 1600 px, lossless</string>
+    <string name="kbits" tools:ignore="PluralsCandidate">%d kbit/s</string>
 </resources>

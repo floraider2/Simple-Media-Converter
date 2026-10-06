@@ -3,12 +3,13 @@ package com.simpleconverter.app.convert.audio
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ConversionException
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.OutputFormat
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Tonspur → WAV, FLAC, Opus oder MP3. Dekodiert wird immer mit MediaCodec,
@@ -32,7 +33,7 @@ object AudioConverter {
         OutputFormat.MP3 -> StereoDownmix(Mp3Sink(output, settings.audioBitrate))
         OutputFormat.OPUS -> {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                throw ConversionException("Opus braucht mindestens Android 10.")
+                throw ConversionException(R.string.err_opus_needs_android10)
             }
             StereoDownmix(
                 Resampler(
@@ -41,6 +42,6 @@ object AudioConverter {
                 )
             )
         }
-        else -> error("Kein reines Audioformat: ${settings.format}")
+        else -> error("Not an audio format: ${settings.format}")
     }
 }

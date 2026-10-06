@@ -7,11 +7,11 @@ import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Stapel-Aufträge liegen als JSON-Dateien im App-Speicher, weil WorkManager-Data auf 10 KB

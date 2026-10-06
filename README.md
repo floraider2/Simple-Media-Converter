@@ -44,6 +44,11 @@ Tests:
 ./gradlew connectedDebugAndroidTest  # Ende-zu-Ende auf angeschlossenem Gerät
 ```
 
+## Sprachen
+
+Englisch und Deutsch. Ab Android 13 lässt sich die Sprache pro App wählen (Einstellungen → Apps → Simple Converter → Sprache).
+Übersetzungen sind willkommen: `app/src/main/res/values/strings.xml` kopieren nach `values-<sprachcode>/strings.xml` und übersetzen.
+
 ## Lizenz
 
 Simple Converter ist freie Software unter der **GNU General Public License v3.0**, siehe [LICENSE](LICENSE).

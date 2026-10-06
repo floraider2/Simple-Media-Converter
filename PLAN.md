@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests + 4 Geräte-Tests grün, Lint sauber, getestet auf Galaxy S24 Ultra / Android 16)
 
-**Aktueller Schwerpunkt:** v0.2 ist fertig (Release v0.2.0). Als Nächstes: v0.3.
+**Aktueller Schwerpunkt:** v0.3 – Sprachen ✅, als Nächstes Einstellungen-Seite, Kürzen, Lautstärke, Verlauf.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -91,7 +91,7 @@ Ein Medienkonverter für Android, der **komplett offline** läuft:
 | L4 | ✅ UI verliert laufenden Job nach Prozess-Tod | Fortschrittsbildschirm fehlt nach Neustart | Laufende Arbeit per WorkManager-Tag beim Start wieder aufnehmen (v0.1.1) |
 | L5 | ✅ Hochkant-Videos + Skalierung ungetestet (geprüft: 1080×2340 → 720×1560, richtig gedreht) | evtl. Balken oder falsche Ausrichtung | Testvideo hochkant 1080×1920 prüfen (v0.1.1) |
 | L6 | ✅ HDR-Videos (HDR10/HLG) | evtl. blasse Farben oder Fehler | Media3 `HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL` setzen (v0.2) |
-| L7 | Texte fest im Kotlin-Code | keine Übersetzung möglich | Nach `strings.xml` verschieben (v0.3) |
+| L7 | ✅ Texte fest im Kotlin-Code | keine Übersetzung möglich | Nach `strings.xml` verschieben (v0.3) |
 | L8 | ✅ Android 8/9: Ergebnis nur im App-Ordner („Speichern unter …“) | nicht in der Galerie sichtbar | „Speichern unter …“ per `CreateDocument` anbieten (v0.2) |
 | L9 | ✅ MP3/FLAC/Opus erledigt (ohne FFmpeg, siehe 5.1) · WebM/MKV als **Ausgabe** fehlen noch | Android hat dafür keine Encoder | FFmpeg (v0.2) |
 | L10 | ~~Git-Commit fehlgeschlagen~~ | – | erledigt |
@@ -219,7 +219,7 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 - [ ] **Einstellungen-Seite**: Standardformat je Medientyp, Speicherort, „EXIF behalten“, Theme (System/Hell/Dunkel)
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
 - [ ] **Quick Settings Tile** (optional)
-- [ ] Alle Texte nach `strings.xml`; **Englisch** als zweite Sprache (L7)
+- [x] Alle Texte nach `strings.xml`: **Englisch** als Grundsprache, **Deutsch** in `values-de` (L7); Sprachwahl pro App ab Android 13; Geräte-Tests sprachunabhängig
 - [ ] Vorschaubilder (Thumbnails) in Setup und Verlauf
 - [ ] Barrierefreiheit: TalkBack-Beschreibungen, Schriftgröße 200 %, Kontrast prüfen
 

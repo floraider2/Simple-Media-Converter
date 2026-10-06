@@ -9,6 +9,7 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
+import com.simpleconverter.app.R
 import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
 import java.io.File
@@ -38,10 +39,10 @@ object OutputStore {
             put(MediaStore.MediaColumns.RELATIVE_PATH, "$dir/$FOLDER")
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        val uri = resolver.insert(collection, values) ?: throw ConversionException("Speichern fehlgeschlagen.")
+        val uri = resolver.insert(collection, values) ?: throw ConversionException(R.string.err_save_failed)
         try {
             resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
-                ?: throw ConversionException("Speichern fehlgeschlagen.")
+                ?: throw ConversionException(R.string.err_save_failed)
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
         } catch (e: Exception) {
             resolver.delete(uri, null, null)
@@ -59,8 +60,8 @@ object OutputStore {
         val resolver = context.contentResolver
         resolver.openInputStream(from)?.use { input ->
             resolver.openOutputStream(to, "w")?.use { input.copyTo(it) }
-                ?: throw ConversionException("Ziel konnte nicht geschrieben werden.")
-        } ?: throw ConversionException("Die Datei ist nicht mehr verfügbar.")
+                ?: throw ConversionException(R.string.err_target_unwritable)
+        } ?: throw ConversionException(R.string.err_file_unreachable)
     }
 
     /** Mehrere Ergebnisse in einen vom Nutzer gewählten Ordner kopieren. Gibt die Anzahl zurück. */

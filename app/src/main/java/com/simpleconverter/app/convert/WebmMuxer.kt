@@ -38,16 +38,16 @@ class WebmMuxer private constructor(path: String) : Muxer {
     private val muxer = try {
         MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM)
     } catch (e: Exception) {
-        throw Muxer.MuxerException("WebM-Datei konnte nicht angelegt werden", e)
+        throw Muxer.MuxerException("Could not create WebM file", e)
     }
     private var started = false
 
     override fun addTrack(format: Format): Muxer.TrackToken {
-        if (started) throw Muxer.MuxerException("Spur nach dem Start hinzugefügt", IllegalStateException())
+        if (started) throw Muxer.MuxerException("Track added after start", IllegalStateException())
         return try {
             Track(muxer.addTrack(MediaFormatUtil.createMediaFormatFromFormat(format)))
         } catch (e: Exception) {
-            throw Muxer.MuxerException("Spur ${format.sampleMimeType} passt nicht in WebM", e)
+            throw Muxer.MuxerException("Track ${format.sampleMimeType} is not supported in WebM", e)
         }
     }
 
@@ -59,7 +59,7 @@ class WebmMuxer private constructor(path: String) : Muxer {
             }
             muxer.writeSampleData((trackToken as Track).index, data, bufferInfo)
         } catch (e: Exception) {
-            throw Muxer.MuxerException("Schreiben in WebM fehlgeschlagen", e)
+            throw Muxer.MuxerException("Writing WebM sample failed", e)
         }
     }
 
@@ -70,7 +70,7 @@ class WebmMuxer private constructor(path: String) : Muxer {
         try {
             if (started) muxer.stop()
         } catch (e: Exception) {
-            throw Muxer.MuxerException("WebM-Datei konnte nicht abgeschlossen werden", e)
+            throw Muxer.MuxerException("Could not finish WebM file", e)
         } finally {
             muxer.release()
         }

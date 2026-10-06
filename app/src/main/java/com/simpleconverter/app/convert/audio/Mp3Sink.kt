@@ -1,5 +1,6 @@
 package com.simpleconverter.app.convert.audio
 
+import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ConversionException
 import java.io.File
 import java.io.RandomAccessFile
@@ -27,10 +28,10 @@ class Mp3Sink(private val output: File, private val bitrate: Int) : PcmSink {
     private var buffer = ByteArray(0)
 
     override fun start(sampleRate: Int, channels: Int) {
-        require(channels in 1..2) { "MP3 kann nur Mono oder Stereo" }
+        require(channels in 1..2) { "MP3 supports mono or stereo only" }
         this.channels = channels
         handle = Lame.nativeInit(sampleRate, channels, (bitrate / 1000).coerceIn(32, 320), QUALITY)
-        if (handle == 0L) throw ConversionException("MP3-Encoder konnte nicht gestartet werden.")
+        if (handle == 0L) throw ConversionException(R.string.err_mp3_start)
         out = RandomAccessFile(output, "rw").apply { setLength(0) }
     }
 
@@ -44,7 +45,7 @@ class Mp3Sink(private val output: File, private val bitrate: Int) : PcmSink {
         val needed = (frames * 5 / 4) + 7200
         if (buffer.size < needed) buffer = ByteArray(needed)
         val written = Lame.nativeEncode(handle, samples, frames, channels, buffer)
-        if (written < 0) throw ConversionException("MP3-Kodierung fehlgeschlagen ($written).")
+        if (written < 0) throw ConversionException(R.string.err_mp3_encode, written)
         out.write(buffer, 0, written)
     }
 

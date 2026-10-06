@@ -12,6 +12,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ImageConverter
 import com.simpleconverter.app.convert.InputCache
 import com.simpleconverter.app.convert.OutputStore
@@ -25,14 +26,14 @@ import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.OutputFormat
 import com.simpleconverter.app.model.RecentItem
 import com.simpleconverter.app.model.outputFileName
+import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.util.UUID
 
 /**
  * Wandelt einen Stapel von Dateien nacheinander um (eine einzelne Datei ist ein Stapel mit
@@ -50,7 +51,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val context = applicationContext
         val jobId = inputData.getString(KEY_JOB_ID)?.let(UUID::fromString) ?: return Result.failure()
         val job = JobStore.loadJob(context, jobId)
-            ?: return Result.failure(workDataOf(KEY_ERROR to "Auftrag nicht gefunden."))
+            ?: return Result.failure(workDataOf(KEY_ERROR to context.getString(R.string.err_job_missing)))
         val files = job.files
         val count = files.size
 
@@ -95,7 +96,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
-                val message = ErrorMessages.forThrowable(t)
+                val message = ErrorMessages.forThrowable(applicationContext, t)
                 if (!appInForeground()) Notifications.failed(context, files.first().name, message)
                 Result.failure(workDataOf(KEY_ERROR to message))
             } finally {
@@ -159,7 +160,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
             throw e
         } catch (t: Throwable) {
             // Throwable statt Exception: auch OutOfMemoryError bei riesigen Bildern abfangen.
-            FileResult(file.name, file.size, null, null, 0L, settings.format.mimeType, ErrorMessages.forThrowable(t))
+            FileResult(file.name, file.size, null, null, 0L, settings.format.mimeType, ErrorMessages.forThrowable(applicationContext, t))
         } finally {
             temp.delete()
             lateCopy?.delete()
@@ -187,8 +188,8 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
     private fun progressNotification(s: Status) = Notifications.progress(
         applicationContext,
-        title = if (s.count > 1) "Datei ${s.index + 1} von ${s.count}: ${s.name}" else s.name,
-        text = if (s.phase == PHASE_COPY) "Datei wird vorbereitet … ${s.progress} %" else "${s.overall} %",
+        title = if (s.count > 1) applicationContext.getString(R.string.notif_file_n, s.index + 1, s.count, s.name) else s.name,
+        text = if (s.phase == PHASE_COPY) applicationContext.getString(R.string.notif_preparing, s.progress) else "${s.overall} %",
         progress = s.overall,
         cancel = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id),
     )

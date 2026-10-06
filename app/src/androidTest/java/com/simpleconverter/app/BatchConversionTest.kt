@@ -50,8 +50,8 @@ class BatchConversionTest {
         val uris = (1..3).map { wav("ton_$it.wav", seconds = 2, frequency = 300.0 * it) }
         share(uris, "audio/*")
 
-        clickWhenVisible("3 Dateien umwandeln")
-        assertVisible("3 Dateien fertig", timeoutMs = 60_000)
+        clickWhenVisible(convertN(3))
+        assertVisible(plural(R.plurals.done_all, 3), timeoutMs = 60_000)
     }
 
     @Test
@@ -60,8 +60,8 @@ class BatchConversionTest {
         val broken = File(dir, "kaputt.wav").apply { writeBytes(ByteArray(4096) { it.toByte() }) }.let(::uri)
         share(good + broken, "audio/*")
 
-        clickWhenVisible("3 Dateien umwandeln")
-        assertVisible("2 von 3 Dateien fertig", timeoutMs = 60_000)
+        clickWhenVisible(convertN(3))
+        assertVisible(context.getString(R.string.done_some, 2, 3), timeoutMs = 60_000)
     }
 
     @Test
@@ -69,18 +69,23 @@ class BatchConversionTest {
         val uris = (1..4).map { png("bild_$it.png", Color.rgb(60 * it, 120, 200)) }
         share(uris, "image/*")
 
-        clickWhenVisible("4 Dateien umwandeln")
-        assertVisible("4 Dateien fertig", timeoutMs = 60_000)
+        clickWhenVisible(convertN(4))
+        assertVisible(plural(R.plurals.done_all, 4), timeoutMs = 60_000)
     }
 
     @Test
     fun bilderUndMusikGemischtWerdenAbgelehnt() {
         share(listOf(png("bild.png", Color.RED), wav("ton.wav", 1, 440.0)), "*/*")
 
-        assertVisible("Bilder lassen sich nicht zusammen", timeoutMs = 10_000)
+        assertVisible(context.getString(R.string.msg_mixed_kinds).take(30), timeoutMs = 10_000)
     }
 
     // ───────────── Hilfen ─────────────
+
+    /** Texte aus den Ressourcen – so läuft der Test in jeder Gerätesprache. */
+    private fun plural(id: Int, n: Int) = context.resources.getQuantityString(id, n, n)
+
+    private fun convertN(n: Int) = plural(R.plurals.setup_convert_n, n)
 
     private fun share(uris: List<Uri>, mime: String) {
         val intent = Intent(Intent.ACTION_SEND_MULTIPLE)

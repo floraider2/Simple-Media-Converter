@@ -63,7 +63,7 @@ class OutputFileNameTest {
     fun `Datei ohne Endung`() = assertEquals("foto.jpg", outputFileName("foto", OutputFormat.JPG))
 
     @Test
-    fun `versteckte Datei ohne Namen`() = assertEquals("umgewandelt.png", outputFileName(".heic", OutputFormat.PNG))
+    fun `versteckte Datei ohne Namen`() = assertEquals("converted.png", outputFileName(".heic", OutputFormat.PNG))
 }
 
 class SettingsAndPresetsTest {

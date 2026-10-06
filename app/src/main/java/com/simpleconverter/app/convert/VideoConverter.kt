@@ -24,14 +24,14 @@ import androidx.media3.transformer.VideoEncoderSettings
 import com.simpleconverter.app.model.Bitrate
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.OutputFormat
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 /**
  * Video → MP4 (H.264 oder H.265 + AAC), Video → WebM (VP9 + Opus) und Video/Audio → M4A (AAC)
