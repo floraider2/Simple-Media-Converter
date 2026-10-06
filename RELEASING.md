@@ -1,13 +1,30 @@
 # Releases veröffentlichen
 
-Releases entstehen automatisch: Tag pushen → GitHub Actions baut die signierte APK und legt sie unter **Releases** ab.
+Zwei Wege – beide erzeugen dieselbe, mit dem Release-Schlüssel signierte APK.
+
+## A) Lokal mit der GitHub CLI (funktioniert immer)
 
 ```bash
-git tag v0.2.0
+./gradlew assembleRelease          # signiert mit ../SimpleConverter-Signing
+cp app/build/outputs/apk/release/app-release.apk SimpleConverter-v0.2.0.apk
+sha256sum SimpleConverter-v0.2.0.apk > SimpleConverter-v0.2.0.apk.sha256
+git tag -a v0.2.0 -m "Simple Converter 0.2.0" && git push origin v0.2.0
+gh release create v0.2.0 SimpleConverter-v0.2.0.apk SimpleConverter-v0.2.0.apk.sha256 --title "Simple Converter 0.2.0" --notes-file notes.md
+```
+
+Vorher die Release-APK auf einem Gerät testen (R8 entfernt Code – Fehler zeigen sich nur im Release-Build).
+
+## B) Automatisch per GitHub Actions
+
+Tag pushen → `.github/workflows/release.yml` baut die signierte APK und legt sie unter **Releases** ab.
+Voraussetzung: GitHub Actions läuft für das Konto, und die Secrets unten sind eingerichtet.
+
+```bash
+git tag -a v0.2.0 -m "Simple Converter 0.2.0"
 git push origin v0.2.0
 ```
 
-## Einmalig: Signaturschlüssel als Secrets hinterlegen
+## Für B einmalig: Signaturschlüssel als Secrets hinterlegen
 
 Der Schlüssel liegt **nicht** im Repo, sondern in `../SimpleConverter-Signing/` (neben dem Projektordner).
 Unter *Settings → Secrets and variables → Actions → New repository secret* vier Einträge anlegen:

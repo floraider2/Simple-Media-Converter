@@ -46,4 +46,3 @@ jobs:
             SimpleConverter-${{ github.ref_name }}.apk
             SimpleConverter-${{ github.ref_name }}.apk.sha256
           generate_release_notes: true
-          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
