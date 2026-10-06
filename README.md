@@ -1,82 +1,126 @@
 # Simple Converter
 
-Offline-Medienkonverter für Android. Keine Werbung, keine Cloud, keine Anmeldung und **keine Internet-Berechtigung**.
+**[English](#english) · [Deutsch](#deutsch)**
 
-## Was die App kann
+<a id="english"></a>
 
-| Eingabe | Ziel | Engine |
+I just needed a simple media converter app. That's it.
+
+Everything I found on the Play Store either had ads, needed internet, processed my files in the cloud or, even worse, cost money.
+
+So I vibe-coded one with Claude. **No ads, no cloud, no sign-up and no internet permission.** Your files never leave your phone.
+
+That's all. If you have ideas, feel free to [open an issue](https://github.com/floraider2/Simple-Media-Converter/issues/new). Maybe I still have some Claude tokens left 😄
+
+**[⬇️ Download the latest APK](https://github.com/floraider2/Simple-Media-Converter/releases/latest)**
+
+## What it does
+
+| Input | Output | Engine |
 |---|---|---|
-| 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264 oder H.265 + AAC), Auflösung, Bitrate, Zielgröße, Ton entfernen; HDR wird nach SDR umgerechnet | Media3 Transformer (Hardware) |
-| 🎬 Video | WebM (VP9 + Opus, ab Android 10) | Media3 Transformer + MediaMuxer |
-| 🎬 Video / 🎵 Audio | MP3 (32–320 kbit/s) | LAME 3.100 (nativ, im Repo) |
-| 🎬 Video / 🎵 Audio | M4A (AAC) mit wählbarer Bitrate | Media3 Transformer |
-| 🎬 Video / 🎵 Audio | Opus in OGG (ab Android 10) | MediaCodec + MediaMuxer |
-| 🎬 Video / 🎵 Audio | FLAC (verlustfrei) | MediaCodec |
-| 🎬 Video / 🎵 Audio | WAV (16-Bit-PCM) | MediaCodec |
-| 🖼️ Bild (JPG, PNG, WebP, HEIC, AVIF*) | JPG, PNG, WebP, Skalieren, Qualität; EXIF wird entfernt, auf Wunsch bleiben Kameradaten (nie der Standort) | ImageDecoder / Bitmap.compress |
+| 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264 or H.265 + AAC): resolution, bitrate, target size, remove audio; HDR is converted to SDR | Media3 Transformer (hardware) |
+| 🎬 Video | WebM (VP9 + Opus, Android 10+) | Media3 Transformer + MediaMuxer |
+| 🎬 Video / 🎵 Audio | MP3 (32–320 kbit/s) | LAME 3.100 (native, in this repo) |
+| 🎬 Video / 🎵 Audio | M4A (AAC) | Media3 Transformer |
+| 🎬 Video / 🎵 Audio | Opus in OGG (Android 10+) | MediaCodec + MediaMuxer |
+| 🎬 Video / 🎵 Audio | FLAC (lossless) | MediaCodec |
+| 🎬 Video / 🎵 Audio | WAV (16-bit PCM) | MediaCodec |
+| 🖼️ Image (JPG, PNG, WebP, HEIC, AVIF*) | JPG, PNG, WebP: resize, quality; EXIF is removed, optionally camera details are kept (never the location) | ImageDecoder / Bitmap.compress |
 
-\* HEIC ab Android 9, AVIF ab Android 12, sofern das Gerät es dekodiert.
+\* HEIC from Android 9, AVIF from Android 12, if the device can decode it.
 
-**Mehrere Dateien:** bis zu 100 auf einmal auswählen oder teilen, z. B. 50 HEIC-Fotos → JPG. Schlägt eine Datei fehl, laufen die anderen weiter.
+- **Share to the app** from your gallery, WhatsApp or file manager, or pick files inside the app (gallery or file search, music too).
+- **Presets instead of jargon:** For WhatsApp · For email (< 25 MB) · Smallest file · Max. quality. Codec, bitrate and resolution are under “Advanced”.
+- **Many files at once:** up to 100, e.g. 50 HEIC photos → JPG. If one file fails, the others keep going.
+- **Runs in the background** with progress in the notification.
+- **Where files go:** `Movies/`, `Music/` or `Pictures/SimpleConverter` by default. In the settings you can pick a default folder per file type, and change the folder for a single conversion. Results can be shared, opened or saved anywhere with “Save as …”.
+- **Settings:** default format per file type, save location, keep camera details, theme (system / light / dark).
+- **Languages:** English and German. On Android 13+ you can choose the language for this app only (*Settings → Apps → Simple Converter → Language*).
 
-**Dateien öffnen:** in der App über die Galerie (Photo Picker) oder „Datei suchen“ (Systemdateiauswahl, auch für Musik), oder von außen über **Teilen an** / **Öffnen mit**.
+Requires Android 8 or newer.
 
-**Vorgaben:** Für WhatsApp · Für E-Mail (< 25 MB) · Kleinste Datei · Max. Qualität. Unter „Erweitert“ gibt es Auflösung, Zielgröße, Bitrate und Qualität.
+## Building
 
-Ergebnisse landen standardmäßig in `Movies/`, `Music/` oder `Pictures/SimpleConverter`. In den **Einstellungen** lässt sich pro Dateityp ein anderer Standardordner wählen, beim Umwandeln auch ein Ordner nur für diese eine Datei. Außerdem: teilen, öffnen oder **„Speichern unter …“**.
-
-**Einstellungen:** Standardformat je Dateityp, Speicherort, „Kameradaten behalten“, Design (System/Hell/Dunkel). **Sprachen:** Englisch und Deutsch.
-
-Die Umwandlung läuft in WorkManager mit einem Foreground Service und zeigt den Fortschritt in der Benachrichtigung. Ohne eigenen Ordner landen Ergebnisse unter Android 8 und 9 im App-Ordner.
-
-## Bauen
-
-Benötigt JDK 17 und das Android SDK (Plattform 35) mit NDK 27.2 und CMake 3.22.1 (für LAME).
+Needs JDK 17 and the Android SDK (platform 35) with NDK 27.2 and CMake 3.22.1 (for LAME).
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk` – installiert sich als **„Simple Converter Debug“** (`com.simpleconverter.app.debug`) neben einer offiziellen Version.
-
-Tests:
+The APK in `app/build/outputs/apk/debug/` installs as **“Simple Converter Debug”** (`com.simpleconverter.app.debug`), next to an official version.
 
 ```bash
-./gradlew testDebugUnitTest          # Unit-Tests
-./gradlew connectedDebugAndroidTest  # Ende-zu-Ende auf angeschlossenem Gerät
+./gradlew testDebugUnitTest          # unit tests
+./gradlew connectedDebugAndroidTest  # end-to-end tests on a connected device
 ```
 
-## Sprachen
+How releases are built and signed: [RELEASING.md](RELEASING.md).
 
-Englisch und Deutsch. Ab Android 13 lässt sich die Sprache pro App wählen (Einstellungen → Apps → Simple Converter → Sprache).
-Übersetzungen sind willkommen: `app/src/main/res/values/strings.xml` kopieren nach `values-<sprachcode>/strings.xml` und übersetzen.
-
-## Lizenz
-
-Simple Converter ist freie Software unter der **GNU General Public License v3.0**, siehe [LICENSE](LICENSE).
-MP3 nutzt LAME (LGPL), siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Download
-
-Fertige APKs gibt es unter [Releases](https://github.com/floraider2/Simple-Media-Converter/releases). Wie Releases entstehen: [RELEASING.md](RELEASING.md).
-
-## Struktur
+## Project structure
 
 ```
 app/src/main/java/com/simpleconverter/app/
-├── MainActivity.kt          Teilen-/Öffnen-Intents, Compose-Einstieg
-├── model/Model.kt           Formate, Einstellungen, Vorgaben
-├── data/                    Datei-Infos, Verlauf
-├── convert/                 Video- und Bild-Konverter, Speichern
-│   └── audio/               Dekoder → WAV/FLAC/Opus/MP3, Downmix, Resampling
-├── work/ConversionWorker.kt Hintergrundarbeit + Benachrichtigung
-└── ui/                      ViewModel, Bildschirme, Theme
-app/src/main/cpp/            JNI-Brücke + LAME-Quellcode
+├── MainActivity.kt          share/open intents, Compose entry point
+├── model/Model.kt           formats, settings, presets
+├── data/                    file info, history, app settings
+├── convert/                 video and image converters, saving
+│   └── audio/               decoder → WAV/FLAC/Opus/MP3, downmix, resampling
+├── work/ConversionWorker.kt background work + notifications
+└── ui/                      ViewModel, screens, theme
+app/src/main/cpp/            JNI bridge + LAME source
 ```
 
-## Fahrplan
+## Translations
 
-- **v0.2:** ✅ Stapelverarbeitung, MP3/Opus/FLAC, WebM, H.265, HDR→SDR, „Speichern unter“, Kameradaten behalten
-- **v0.3:** ✅ Englisch + Deutsch, Einstellungen, Speicherort
-- **v0.4:** Kürzen mit Vorschau, Lautstärke angleichen, Verlauf mit Suche, Widget
-- **v1.0:** F-Droid und Play Store, Open Source
+Translations are welcome: copy `app/src/main/res/values/strings.xml` to `values-<language code>/strings.xml`, translate it and open a pull request.
+
+## Roadmap
+
+- **v0.1** ✅ Video, audio and image conversion, sharing, presets
+- **v0.2** ✅ Batch conversion, MP3/Opus/FLAC, WebM, H.265, HDR → SDR, “Save as”, keep camera details
+- **v0.3** ✅ English + German, settings, save location
+- **v0.4** Trim with preview, loudness normalization, history with search, widget
+- **v1.0** F-Droid and Play Store
+
+Details: [PLAN.md](PLAN.md) (German).
+
+## License
+
+Simple Converter is free software under the **GNU General Public License v3.0**, see [LICENSE](LICENSE).
+MP3 encoding uses LAME (LGPL), see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+---
+
+<a id="deutsch"></a>
+
+## 🇩🇪 Deutsch
+
+Ich brauchte nur eine simple Medien-Converter-App. Das war's.
+
+Alles, was man im Play Store findet, hat Werbung, braucht Internet, verarbeitet die Dateien in der Cloud oder kostet, noch blöder, Geld.
+
+Also habe ich sie mit Claude gevibecodet. **Keine Werbung, keine Cloud, keine Anmeldung und keine Internet-Berechtigung.** Deine Dateien verlassen nie dein Handy.
+
+Das war's. Wenn ihr noch Ideen habt, [schreibt gern ein Issue](https://github.com/floraider2/Simple-Media-Converter/issues/new). Vielleicht hab ich ja noch Claude-Tokens frei XD
+
+**[⬇️ Neueste APK herunterladen](https://github.com/floraider2/Simple-Media-Converter/releases/latest)**
+
+### Was die App kann
+
+- 🎬 **Video** → MP4 (H.264/H.265) oder WebM: Auflösung ändern, Zielgröße wie „unter 25 MB“, Ton entfernen
+- 🎵 **Audio** (auch der Ton aus einem Video) → MP3, M4A, Opus, FLAC oder WAV
+- 🖼️ **Bild** (auch HEIC) → JPG, PNG oder WebP: verkleinern, Qualität wählen; Standort und EXIF-Daten werden entfernt
+- **Teilen an die App** aus Galerie, WhatsApp oder Dateimanager, oder Dateien in der App suchen
+- **Vorgaben statt Fachbegriffe:** Für WhatsApp · Für E-Mail · Kleinste Datei · Max. Qualität
+- **Viele Dateien auf einmal**, z. B. 50 HEIC-Fotos → JPG
+- Läuft **im Hintergrund** mit Fortschritt in der Benachrichtigung
+- **Einstellungen:** Standardformat und Speicherort je Dateityp, Design (System/Hell/Dunkel)
+- **Sprachen:** Deutsch und Englisch
+
+Ab Android 8.
+
+Technische Details (Formate, Bauen, Projektstruktur) stehen oben im englischen Teil, der ausführliche Fahrplan in [PLAN.md](PLAN.md).
+
+### Lizenz
+
+Freie Software unter der **GNU General Public License v3.0**, siehe [LICENSE](LICENSE). MP3 nutzt LAME (LGPL), siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
