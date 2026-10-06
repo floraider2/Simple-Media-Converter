@@ -2,12 +2,15 @@
 
 Offline-Medienkonverter für Android. Keine Werbung, keine Cloud, keine Anmeldung und **keine Internet-Berechtigung**.
 
-## Was v0.1 kann
+## Was die App kann
 
 | Eingabe | Ziel | Engine |
 |---|---|---|
 | 🎬 Video (MP4, MKV, WebM, MOV, 3GP …) | MP4 (H.264/AAC), Auflösung, Bitrate, Zielgröße, Ton entfernen | Media3 Transformer (Hardware) |
+| 🎬 Video / 🎵 Audio | MP3 (32–320 kbit/s) | LAME 3.100 (nativ, im Repo) |
 | 🎬 Video / 🎵 Audio | M4A (AAC) mit wählbarer Bitrate | Media3 Transformer |
+| 🎬 Video / 🎵 Audio | Opus in OGG (ab Android 10) | MediaCodec + MediaMuxer |
+| 🎬 Video / 🎵 Audio | FLAC (verlustfrei) | MediaCodec |
 | 🎬 Video / 🎵 Audio | WAV (16-Bit-PCM) | MediaCodec |
 | 🖼️ Bild (JPG, PNG, WebP, HEIC, AVIF*) | JPG, PNG, WebP, Skalieren, Qualität, EXIF wird entfernt | ImageDecoder / Bitmap.compress |
 
@@ -23,7 +26,7 @@ Die Umwandlung läuft in WorkManager mit einem Foreground Service und zeigt den 
 
 ## Bauen
 
-Benötigt JDK 17 und das Android SDK (Plattform 35).
+Benötigt JDK 17 und das Android SDK (Plattform 35) mit NDK 27.2 und CMake 3.22.1 (für LAME).
 
 ```bash
 ./gradlew assembleDebug
@@ -38,6 +41,10 @@ Tests:
 ./gradlew connectedDebugAndroidTest  # Ende-zu-Ende auf angeschlossenem Gerät
 ```
 
+## Lizenzen
+
+MP3 nutzt LAME (LGPL), siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Struktur
 
 ```
@@ -45,13 +52,15 @@ app/src/main/java/com/simpleconverter/app/
 ├── MainActivity.kt          Teilen-/Öffnen-Intents, Compose-Einstieg
 ├── model/Model.kt           Formate, Einstellungen, Vorgaben
 ├── data/                    Datei-Infos, Verlauf
-├── convert/                 Video-, WAV- und Bild-Konverter, Speichern
+├── convert/                 Video- und Bild-Konverter, Speichern
+│   └── audio/               Dekoder → WAV/FLAC/Opus/MP3, Downmix, Resampling
 ├── work/ConversionWorker.kt Hintergrundarbeit + Benachrichtigung
 └── ui/                      ViewModel, Bildschirme, Theme
+app/src/main/cpp/            JNI-Brücke + LAME-Quellcode
 ```
 
 ## Fahrplan
 
-- **v0.2:** ~~Stapelverarbeitung~~ ✅, FFmpeg für MP3/FLAC/OGG/WebM-Ausgabe
+- **v0.2:** ~~Stapelverarbeitung~~ ✅, ~~MP3/Opus/FLAC~~ ✅, WebM-Video offen
 - **v0.3:** Kürzen mit Vorschau, Lautstärke angleichen, Widget
 - **v1.0:** F-Droid und Play Store, Open Source

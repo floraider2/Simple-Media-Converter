@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests + 4 Geräte-Tests grün, Lint sauber, getestet auf Galaxy S24 Ultra / Android 16)
 
-**Aktueller Schwerpunkt:** v0.2 – Stapelverarbeitung ist fertig, als Nächstes FFmpeg.
+**Aktueller Schwerpunkt:** v0.2 – Stapelverarbeitung und MP3/Opus/FLAC sind fertig. Offen: WebM-Video, H.265, HDR.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Arbeits-Branch: `media3-v0.1`
 
@@ -93,7 +93,7 @@ Ein Medienkonverter für Android, der **komplett offline** läuft:
 | L6 | HDR-Videos (HDR10/HLG) | evtl. blasse Farben oder Fehler | Media3 `HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL` setzen (v0.2) |
 | L7 | Texte fest im Kotlin-Code | keine Übersetzung möglich | Nach `strings.xml` verschieben (v0.3) |
 | L8 | Android 8/9: Ergebnis nur im App-Ordner | nicht in der Galerie sichtbar | „Speichern unter …“ per `CreateDocument` anbieten (v0.2) |
-| L9 | MP3/FLAC/OGG/WebM/MKV als **Ausgabe** fehlen | Android hat dafür keine Encoder | FFmpeg (v0.2) |
+| L9 | ✅ MP3/FLAC/Opus erledigt (ohne FFmpeg, siehe 5.1) · WebM/MKV als **Ausgabe** fehlen noch | Android hat dafür keine Encoder | FFmpeg (v0.2) |
 | L10 | ~~Git-Commit fehlgeschlagen~~ | – | erledigt |
 
 ---
@@ -170,7 +170,24 @@ Ziel: v0.1 läuft zuverlässig auf echten Geräten.
 - [x] Ergebnis: Liste mit „Alle teilen“, Fehler je Datei sichtbar
 - [x] Geteilte Dateien eines Stapels werden vorab in den Cache kopiert, wenn genug Platz frei ist
 
-**FFmpeg-Engine**
+**Audio-Formate – umgesetzt ohne FFmpeg (Entscheidung 06.10.2026)**
+
+Beim Nachprüfen zeigte sich: Android bringt Encoder für Opus (ab 10) und FLAC selbst mit, MediaMuxer schreibt OGG.
+Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten FFmpeg (mehrere MB, Linux-Build nötig).
+
+- [x] Gemeinsame Kette: `PcmDecoder` (MediaCodec) → optional `StereoDownmix`/`Resampler` (Media3 Sonic) → Ausgabe
+- [x] MP3 über LAME 3.100: Quellcode im Repo (`app/src/main/cpp/lame`), Build per CMake im normalen Gradle-Lauf, JNI-Brücke `mp3_jni.c`, Info-Tag für exakte Länge
+- [x] Opus in OGG über MediaCodec + MediaMuxer (Android 10+), Resampling auf 48 kHz wenn nötig
+- [x] FLAC über MediaCodec, Datei selbst geschrieben, Gesamtlänge nachträglich in STREAMINFO eingetragen
+- [x] Vorgaben: MP3 Standard/Hoch/Klein, Opus Standard/Hoch/Sprache, FLAC verlustfrei
+- [x] 16-KB-Seiten für Android 15+ (`ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES`)
+
+**Noch offen (früher unter „FFmpeg-Engine“)**
+- [ ] WebM (VP9 + Opus) – Kandidat: MediaCodec-VP9 + MediaMuxer WEBM, ohne FFmpeg
+- [ ] MKV – nur falls wirklich gefragt
+
+<details><summary>Ursprünglicher FFmpeg-Plan (zurückgestellt)</summary>
+
 - [ ] Android NDK installieren (r27+)
 - [ ] FFmpeg 7.x selbst bauen – minimal, nur was gebraucht wird:
   - Encoder: `libmp3lame`, `libopus`, `libvorbis`, `flac` (nativ), `libvpx` (VP9 für WebM)
@@ -184,6 +201,8 @@ Ziel: v0.1 läuft zuverlässig auf echten Geräten.
 - [ ] Neue Ziele: MP3, FLAC, OGG (Vorbis), Opus, WebM (VP9/Opus), MKV
 - [ ] Gradle-Modul `:ffmpeg`, damit der native Build getrennt bleibt
 - [ ] Build-Skript ins Repo (`ffmpeg/build.sh`), reproduzierbar für F-Droid
+
+</details>
 
 **Weitere Punkte**
 - [ ] H.265-Option unter „Erweitert“ (nur anzeigen, wenn Encoder vorhanden)
@@ -277,6 +296,17 @@ Gesteuert per adb mit selbst erzeugten Testdateien (Ton-WAV, Bildschirmaufnahme,
 **Stapelverarbeitung (v0.2)** – `BatchConversionTest` 4/4 grün, Einzeldatei-Testreihe erneut bestanden.
 Gefunden: Bei Bild-Stapeln lag „Umwandeln“ unter dem Bildschirmrand → Knopf steht jetzt fest unten.
 
+**Audio-Formate (06.10.2026)** – alle Dateien gültig, Dauer vom System korrekt erkannt
+
+| Test | Dauer | Ergebnis |
+|---|---|---|
+| 20 s WAV → MP3 192k / 320k | je ~2 s | 470 KB / 783 KB, Länge 20,04 s |
+| 20 s WAV → Opus 128k / 32k | ~3 s | 342 KB / 106 KB |
+| 20 s WAV → FLAC | ~2 s | 393 KB, Länge exakt 20,00 s |
+| 10 min WAV (110 MB) → MP3 / Opus / FLAC | 13 s / 25 s / 11 s | 13,7 MB / 10,0 MB / 10,7 MB |
+
+Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Encoder-Schleife beim Füttern jedes Mal 10 ms auf Ausgabe wartete → jetzt ohne Warten, 12–20× schneller.
+
 **Gefunden und behoben**
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.
 - Videos ohne Tonspur boten „Nur Ton“ an und scheiterten mit technischer Meldung → Tonspur wird per `MediaExtractor` erkannt (Samsung liefert `METADATA_KEY_HAS_AUDIO` nicht), Ton-Optionen werden ausgeblendet.
@@ -340,7 +370,7 @@ Gefunden: Bei Bild-Stapeln lag „Umwandeln“ unter dem Bildschirmrand → Knop
 1. ~~Git-Identität~~ → `floraider2` mit der anonymen GitHub-Adresse (noreply)
 2. ~~Remote~~ → GitHub `floraider2/Simple-Media-Converter`. Der ältere Branch `claude/friendly-einstein-c1yujb` (FFmpeg-Variante) wird nicht weiterverfolgt.
 3. **Paketname**: `com.simpleconverter.app` ist ein Platzhalter – eigene Domain/Name gewünscht? (Muss vor dem ersten Store-Release feststehen, danach nicht mehr änderbar.)
-4. **App-Lizenz**: GPL-3.0 oder Apache-2.0?
+4. **App-Lizenz**: GPL-3.0 oder Apache-2.0? (LAME ist LGPL und als eigene .so eingebunden – passt zu beiden.)
 5. **Sprache**: Englisch ab v0.3 genug, oder weitere Sprachen?
 6. **Testgerät**: Welches Android-Handy steht zum Testen zur Verfügung?
 

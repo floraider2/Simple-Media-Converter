@@ -370,7 +370,7 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
     }
 }
 
-private fun hasAdvanced(format: OutputFormat) = format != OutputFormat.WAV
+private fun hasAdvanced(format: OutputFormat) = format != OutputFormat.WAV && format != OutputFormat.FLAC
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -412,7 +412,12 @@ private fun AdvancedOptions(
                     if (!settings.removeAudio) AudioBitrateChips(settings, update)
                 }
             }
-            OutputFormat.M4A -> AudioBitrateChips(settings, update)
+            OutputFormat.M4A, OutputFormat.MP3 -> AudioBitrateChips(settings, update)
+            OutputFormat.OPUS -> ChipGroup(
+                "Audio-Bitrate",
+                listOf(32_000 to "32k", 64_000 to "64k", 96_000 to "96k", 128_000 to "128k", 192_000 to "192k"),
+                settings.audioBitrate,
+            ) { v -> if (v != null) update { it.copy(audioBitrate = v) } }
             OutputFormat.JPG, OutputFormat.WEBP, OutputFormat.PNG -> {
                 ChipGroup(
                     "Maximale Größe (längste Seite)",
@@ -428,7 +433,7 @@ private fun AdvancedOptions(
                     )
                 }
             }
-            OutputFormat.WAV -> Unit
+            OutputFormat.WAV, OutputFormat.FLAC -> Unit
         }
     }
 }

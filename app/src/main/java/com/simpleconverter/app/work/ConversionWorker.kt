@@ -16,7 +16,7 @@ import com.simpleconverter.app.convert.ImageConverter
 import com.simpleconverter.app.convert.InputCache
 import com.simpleconverter.app.convert.OutputStore
 import com.simpleconverter.app.convert.VideoConverter
-import com.simpleconverter.app.convert.WavConverter
+import com.simpleconverter.app.convert.audio.AudioConverter
 import com.simpleconverter.app.data.RecentStore
 import com.simpleconverter.app.data.formatSize
 import com.simpleconverter.app.model.ConversionSettings
@@ -143,7 +143,8 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
             when (settings.format) {
                 OutputFormat.MP4, OutputFormat.M4A ->
                     VideoConverter.convert(context, input, temp, settings, file.durationMs, onProgress)
-                OutputFormat.WAV -> WavConverter.convert(context, input, temp, onProgress)
+                OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV ->
+                    AudioConverter.convert(context, input, temp, settings, onProgress)
                 OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP ->
                     ImageConverter.convert(context, input, temp, settings)
             }

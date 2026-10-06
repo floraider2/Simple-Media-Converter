@@ -108,10 +108,16 @@ class SettingsAndPresetsTest {
         val image = OutputFormat.targetsFor(MediaKind.IMAGE)
         assertEquals(listOf(OutputFormat.MP4), silentVideo)
         assertEquals(video, OutputFormat.intersect(listOf(video, video)))
-        assertEquals(listOf(OutputFormat.M4A, OutputFormat.WAV), OutputFormat.intersect(listOf(video, audio)))
+        assertEquals(audio, OutputFormat.intersect(listOf(video, audio)))
         assertEquals(listOf(OutputFormat.MP4), OutputFormat.intersect(listOf(video, silentVideo)))
         assertEquals(emptyList<OutputFormat>(), OutputFormat.intersect(listOf(image, audio)))
         assertEquals(emptyList<OutputFormat>(), OutputFormat.intersect(emptyList()))
+    }
+
+    @Test
+    fun `Opus erst ab Android 10`() {
+        assertTrue(OutputFormat.OPUS !in OutputFormat.targetsFor(MediaKind.AUDIO, sdkInt = 28))
+        assertTrue(OutputFormat.OPUS in OutputFormat.targetsFor(MediaKind.AUDIO, sdkInt = 29))
     }
 
     @Test

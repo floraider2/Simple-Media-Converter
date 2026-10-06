@@ -6,9 +6,19 @@ import androidx.work.workDataOf
 
 enum class MediaKind { VIDEO, AUDIO, IMAGE }
 
-enum class OutputFormat(val label: String, val extension: String, val mimeType: String, val kind: MediaKind) {
+enum class OutputFormat(
+    val label: String,
+    val extension: String,
+    val mimeType: String,
+    val kind: MediaKind,
+    /** Ab welcher Android-Version das Format erzeugt werden kann. */
+    val minSdk: Int = 26,
+) {
     MP4("MP4", "mp4", "video/mp4", MediaKind.VIDEO),
+    MP3("MP3", "mp3", "audio/mpeg", MediaKind.AUDIO),
     M4A("M4A (AAC)", "m4a", "audio/mp4", MediaKind.AUDIO),
+    OPUS("Opus", "ogg", "audio/ogg", MediaKind.AUDIO, minSdk = 29),
+    FLAC("FLAC", "flac", "audio/flac", MediaKind.AUDIO),
     WAV("WAV", "wav", "audio/wav", MediaKind.AUDIO),
     JPG("JPG", "jpg", "image/jpeg", MediaKind.IMAGE),
     PNG("PNG", "png", "image/png", MediaKind.IMAGE),
@@ -16,11 +26,11 @@ enum class OutputFormat(val label: String, val extension: String, val mimeType: 
 
     companion object {
         /** Zielformate für einen Medientyp; ohne Tonspur gibt es keine Audio-Ziele. */
-        fun targetsFor(kind: MediaKind, hasAudio: Boolean = true): List<OutputFormat> = when (kind) {
-            MediaKind.VIDEO -> listOf(MP4, M4A, WAV)
-            MediaKind.AUDIO -> listOf(M4A, WAV)
+        fun targetsFor(kind: MediaKind, hasAudio: Boolean = true, sdkInt: Int = Int.MAX_VALUE): List<OutputFormat> = when (kind) {
+            MediaKind.VIDEO -> listOf(MP4, MP3, M4A, OPUS, FLAC, WAV)
+            MediaKind.AUDIO -> listOf(MP3, M4A, OPUS, FLAC, WAV)
             MediaKind.IMAGE -> listOf(JPG, PNG, WEBP)
-        }.filter { hasAudio || it.kind != MediaKind.AUDIO }
+        }.filter { (hasAudio || it.kind != MediaKind.AUDIO) && sdkInt >= it.minSdk }
 
         /** Formate, die in allen Listen vorkommen (Reihenfolge der ersten Liste). */
         fun intersect(lists: List<List<OutputFormat>>): List<OutputFormat> =
@@ -39,7 +49,7 @@ data class InputFile(
     val hasAudio: Boolean = true,
 ) {
     /** Zielformate, die für diese Datei Sinn ergeben. */
-    fun targets(): List<OutputFormat> = OutputFormat.targetsFor(kind, hasAudio)
+    fun targets(): List<OutputFormat> = OutputFormat.targetsFor(kind, hasAudio, android.os.Build.VERSION.SDK_INT)
 }
 
 /** Alle Stellschrauben einer Umwandlung. Die Vorgaben ([Preset]) befüllen sie nur. */
@@ -99,6 +109,26 @@ object Presets {
                 ConversionSettings(format, videoShortSide = 480, videoBitrate = 700_000, audioBitrate = 96_000)),
             Preset("max", "Max. Qualität", "Originalauflösung",
                 ConversionSettings(format, videoBitrate = 12_000_000, audioBitrate = 192_000)),
+        )
+        OutputFormat.MP3 -> listOf(
+            Preset("standard", "Standard", "192 kbit/s, passt überall",
+                ConversionSettings(format, audioBitrate = 192_000)),
+            Preset("high", "Hohe Qualität", "320 kbit/s",
+                ConversionSettings(format, audioBitrate = 320_000)),
+            Preset("small", "Kleine Datei", "128 kbit/s",
+                ConversionSettings(format, audioBitrate = 128_000)),
+        )
+        OutputFormat.OPUS -> listOf(
+            Preset("standard", "Standard", "128 kbit/s, klingt wie MP3 mit 192",
+                ConversionSettings(format, audioBitrate = 128_000)),
+            Preset("high", "Hohe Qualität", "192 kbit/s",
+                ConversionSettings(format, audioBitrate = 192_000)),
+            Preset("speech", "Sprache", "32 kbit/s, ideal für Sprachnachrichten und Hörbücher",
+                ConversionSettings(format, audioBitrate = 32_000)),
+        )
+        OutputFormat.FLAC -> listOf(
+            Preset("lossless", "Verlustfrei", "Etwa halb so groß wie WAV",
+                ConversionSettings(format)),
         )
         OutputFormat.M4A -> listOf(
             Preset("standard", "Standard", "192 kbit/s",
