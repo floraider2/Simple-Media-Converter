@@ -2,7 +2,7 @@
 
 Stand: 06.10.2026 · Neueste Version: **v0.3.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.4 – Kürzen ✅, Lautstärke ✅, als Nächstes Verlauf mit Suche.
+**Aktueller Schwerpunkt:** v0.4 – Kürzen ✅, Lautstärke ✅, Verlauf + Vorschaubilder ✅, als Nächstes Widget, Schnell-Kachel, Barrierefreiheit.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -221,8 +221,8 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 
 - [x] **Kürzen mit Vorschau** (einzelne Video-/Audiodatei): ExoPlayer-Vorschau, Bereichs-Schieberegler (vom System-Zurückwischen ausgenommen), „Anfang hier“/„Ende hier“ an der Abspielstelle. Video über `MediaItem.ClippingConfiguration`, Audio schneidet der `PcmDecoder` sample-genau zu; Zielgröße rechnet mit der gekürzten Länge
 - [x] **Lautstärke angleichen** auf −14 LUFS (EBU R128 / BS.1770, eigener Messer ohne FFmpeg), Spitzen max. −1 dBFS; zwei Durchgänge (messen 0–40 %, umwandeln 40–100 %); für alle Audioformate und die Tonspur von Videos
-- [ ] **Verlauf** auf Room umstellen, Suche/Filter im Verlauf, einzelne Einträge löschen
-- [ ] Vorschaubilder (Thumbnails) in Setup und Verlauf
+- [x] **Verlauf**: eigene Seite mit Suche (Ziel- und Quellname, mehrere Wörter), Filter nach Dateityp, Menü je Eintrag (Teilen, aus Verlauf entfernen – die Datei bleibt); Start zeigt die letzten 5 + „Alle anzeigen“; bis 200 Einträge. **Kein Room**: bei so wenigen Einträgen reicht die bisherige JSON-Speicherung
+- [x] Vorschaubilder in Setup und Verlauf (System-Thumbnails ab Android 10, Zwischenspeicher im RAM); in den Einstellungen abschaltbar (Standard: an)
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
 - [ ] **Quick Settings Tile** (optional)
 - [ ] Barrierefreiheit: TalkBack-Beschreibungen, Schriftgröße 200 %, Kontrast prüfen

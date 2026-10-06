@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
 sealed interface Screen {
     data object Home : Screen
     data object Settings : Screen
+    data object History : Screen
     data class Setup(
         val files: List<InputFile>,
         val format: OutputFormat,
@@ -248,6 +249,18 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             else -> return
         }
         _screen.value = setupFor(files, preferredFormat(files))
+    }
+
+    fun openHistory() {
+        if (_screen.value is Screen.Home) {
+            refreshRecents()
+            _screen.value = Screen.History
+        }
+    }
+
+    fun removeRecent(item: RecentItem) {
+        RecentStore.remove(getApplication(), item.timestamp)
+        refreshRecents()
     }
 
     fun openSettings() {

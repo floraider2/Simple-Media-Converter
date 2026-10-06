@@ -102,6 +102,19 @@ fun SettingsScreen(vm: ConverterViewModel, modifier: Modifier) {
             ),
             settings.theme,
         ) { mode -> vm.updateAppSettings { it.copy(theme = mode) } }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .toggleable(value = settings.showThumbnails, role = Role.Switch) { c -> vm.updateAppSettings { it.copy(showThumbnails = c) } }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_thumbnails))
+                Hint(stringResource(R.string.settings_thumbnails_hint))
+            }
+            Switch(checked = settings.showThumbnails, onCheckedChange = null)
+        }
 
         HorizontalDivider()
         Heading(stringResource(R.string.settings_about))

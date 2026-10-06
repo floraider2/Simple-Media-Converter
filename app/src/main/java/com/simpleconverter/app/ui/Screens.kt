@@ -142,7 +142,8 @@ fun ConverterApp(vm: ConverterViewModel) {
             .padding(padding)
         when (val s = screen) {
             Screen.Settings -> SettingsScreen(vm, modifier)
-            Screen.Home -> HomeScreen(recents, loading, vm::openFiles, vm::clearRecents, modifier)
+            Screen.History -> HistoryScreen(recents, vm::removeRecent, modifier)
+            Screen.Home -> HomeScreen(recents, loading, vm::openFiles, vm::clearRecents, vm::openHistory, modifier)
             is Screen.Setup -> SetupScreen(s, vm, modifier)
             is Screen.Working -> WorkingScreen(s, vm::cancelConversion, modifier)
             is Screen.Done -> DoneScreen(s, vm, modifier)
@@ -159,6 +160,7 @@ private fun titleFor(screen: Screen) = when (screen) {
     is Screen.Done -> stringResource(R.string.title_done)
     is Screen.Failed -> stringResource(R.string.title_error)
     Screen.Settings -> stringResource(R.string.settings_title)
+    Screen.History -> stringResource(R.string.history_title)
     Screen.Home -> ""
 }
 
@@ -170,6 +172,7 @@ private fun HomeScreen(
     loading: Boolean,
     onPick: (List<Uri>) -> Unit,
     onClearRecents: () -> Unit,
+    onShowHistory: () -> Unit,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
@@ -234,35 +237,16 @@ private fun HomeScreen(
                     TextButton(onClick = onClearRecents) { Text(stringResource(R.string.home_clear)) }
                 }
             }
-            items(recents, key = { it.timestamp }) { item ->
-                RecentRow(item) { openOutput(context, item.outputUri, item.mimeType) }
+            items(recents.take(HOME_RECENTS), key = { it.timestamp }) { item ->
+                HistoryRow(item, onOpen = { openOutput(context, item.outputUri, item.mimeType) })
+            }
+            item {
+                TextButton(onClick = onShowHistory) {
+                    Text(stringResource(R.string.history_show_all, recents.size))
+                }
             }
         }
         item { Spacer(Modifier.height(16.dp)) }
-    }
-}
-
-@Composable
-private fun RecentRow(item: RecentItem, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(emojiForMime(item.mimeType), style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.size(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(item.outputName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                "${formatSize(item.inputSize)} → ${formatSize(item.outputSize)} · " +
-                    DateUtils.getRelativeTimeSpanString(item.timestamp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -545,7 +529,7 @@ private fun <T> ChipGroup(title: String, options: List<Pair<T?, String>>, select
 private fun FileHeader(file: InputFile) {
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(emojiFor(file.kind), style = MaterialTheme.typography.headlineMedium)
+            Thumbnail(file.uri, file.kind, size = 56.dp)
             Spacer(Modifier.size(16.dp))
             Column {
                 Text(file.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -792,7 +776,7 @@ private fun emojiForMime(mime: String) = when {
     else -> "🖼️"
 }
 
-private fun shareOutputs(context: Context, uris: List<Uri>, mime: String) {
+internal fun shareOutputs(context: Context, uris: List<Uri>, mime: String) {
     val send = if (uris.size == 1) {
         Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.first())
     } else {
@@ -802,10 +786,13 @@ private fun shareOutputs(context: Context, uris: List<Uri>, mime: String) {
     context.startActivity(Intent.createChooser(send, context.getString(R.string.share)))
 }
 
+/** So viele Einträge zeigt der Startbildschirm; der Rest steht unter „Verlauf“. */
+private const val HOME_RECENTS = 5
+
 /** Obergrenze für die Mehrfachauswahl im Photo Picker. */
 private const val MAX_FILES = 100
 
-private fun openOutput(context: Context, uri: Uri, mime: String) {
+internal fun openOutput(context: Context, uri: Uri, mime: String) {
     val view = Intent(Intent.ACTION_VIEW)
         .setDataAndType(uri, mime)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

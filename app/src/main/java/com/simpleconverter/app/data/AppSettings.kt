@@ -20,6 +20,8 @@ data class AppSettings(
     val folderVideo: String? = null,
     val folderAudio: String? = null,
     val folderImage: String? = null,
+    /** Vorschaubilder in Verlauf und beim Umwandeln laden (sonst nur Symbole). */
+    val showThumbnails: Boolean = true,
 ) {
     fun folderFor(kind: MediaKind) = when (kind) {
         MediaKind.VIDEO -> folderVideo
@@ -57,6 +59,7 @@ class SettingsStore private constructor(context: Context) {
             .putString(KEY_FOLDER_VIDEO, next.folderVideo)
             .putString(KEY_FOLDER_AUDIO, next.folderAudio)
             .putString(KEY_FOLDER_IMAGE, next.folderImage)
+            .putBoolean(KEY_THUMBNAILS, next.showThumbnails)
             .apply()
         _settings.value = next
     }
@@ -78,6 +81,7 @@ class SettingsStore private constructor(context: Context) {
             folderVideo = prefs.getString(KEY_FOLDER_VIDEO, null),
             folderAudio = prefs.getString(KEY_FOLDER_AUDIO, null),
             folderImage = prefs.getString(KEY_FOLDER_IMAGE, null),
+            showThumbnails = prefs.getBoolean(KEY_THUMBNAILS, defaults.showThumbnails),
         )
     }
 
@@ -90,6 +94,7 @@ class SettingsStore private constructor(context: Context) {
         private const val KEY_FOLDER_VIDEO = "folderVideo"
         private const val KEY_FOLDER_AUDIO = "folderAudio"
         private const val KEY_FOLDER_IMAGE = "folderImage"
+        private const val KEY_THUMBNAILS = "showThumbnails"
 
         @Volatile private var instance: SettingsStore? = null
 
