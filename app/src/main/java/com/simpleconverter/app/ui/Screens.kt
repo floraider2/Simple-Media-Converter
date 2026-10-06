@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -118,6 +119,13 @@ fun ConverterApp(vm: ConverterViewModel) {
         topBar = {
             TopAppBar(
                 title = { Text(if (screen is Screen.Home) stringResource(R.string.app_name) else titleFor(screen)) },
+                actions = {
+                    if (screen is Screen.Home) {
+                        IconButton(onClick = vm::openSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
+                        }
+                    }
+                },
                 navigationIcon = {
                     if (screen !is Screen.Home && screen !is Screen.Working) {
                         IconButton(onClick = vm::goHome) {
@@ -133,6 +141,7 @@ fun ConverterApp(vm: ConverterViewModel) {
             .fillMaxSize()
             .padding(padding)
         when (val s = screen) {
+            Screen.Settings -> SettingsScreen(vm, modifier)
             Screen.Home -> HomeScreen(recents, loading, vm::openFiles, vm::clearRecents, modifier)
             is Screen.Setup -> SetupScreen(s, vm, modifier)
             is Screen.Working -> WorkingScreen(s, vm::cancelConversion, modifier)
@@ -149,6 +158,7 @@ private fun titleFor(screen: Screen) = when (screen) {
     is Screen.Working -> stringResource(R.string.title_working)
     is Screen.Done -> stringResource(R.string.title_done)
     is Screen.Failed -> stringResource(R.string.title_error)
+    Screen.Settings -> stringResource(R.string.settings_title)
     Screen.Home -> ""
 }
 

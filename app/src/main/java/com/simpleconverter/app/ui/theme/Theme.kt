@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.simpleconverter.app.data.ThemeMode
 
 private val Brand = Color(0xFF3D5AFE)
 
@@ -17,8 +18,12 @@ private val LightColors = lightColorScheme(primary = Brand, secondary = Color(0x
 private val DarkColors = darkColorScheme(primary = Color(0xFFB6C2FF), secondary = Color(0xFF9FA8DA))
 
 @Composable
-fun SimpleConverterTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun SimpleConverterTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
+    val dark = when (mode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
