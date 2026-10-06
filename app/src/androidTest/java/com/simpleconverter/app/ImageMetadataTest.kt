@@ -48,6 +48,7 @@ class ImageMetadataTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     private val dir = File(context.cacheDir, "androidTest")
+    private val outputs = TestOutputs(context)
 
     @Before
     fun setUp() {
@@ -58,6 +59,7 @@ class ImageMetadataTest {
     @After
     fun tearDown() {
         dir.deleteRecursively()
+        outputs.deleteAll()
     }
 
     @Test

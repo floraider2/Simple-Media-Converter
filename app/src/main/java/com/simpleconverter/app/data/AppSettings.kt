@@ -1,6 +1,7 @@
 package com.simpleconverter.app.data
 
 import android.content.Context
+import androidx.core.content.edit
 import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,17 +51,17 @@ class SettingsStore private constructor(context: Context) {
 
     fun update(transform: (AppSettings) -> AppSettings) {
         val next = transform(_settings.value)
-        prefs.edit()
-            .putString(KEY_VIDEO, next.defaultVideo.name)
-            .putString(KEY_AUDIO, next.defaultAudio.name)
-            .putString(KEY_IMAGE, next.defaultImage.name)
-            .putBoolean(KEY_KEEP_METADATA, next.keepMetadata)
-            .putString(KEY_THEME, next.theme.name)
-            .putString(KEY_FOLDER_VIDEO, next.folderVideo)
-            .putString(KEY_FOLDER_AUDIO, next.folderAudio)
-            .putString(KEY_FOLDER_IMAGE, next.folderImage)
-            .putBoolean(KEY_THUMBNAILS, next.showThumbnails)
-            .apply()
+        prefs.edit {
+            putString(KEY_VIDEO, next.defaultVideo.name)
+            putString(KEY_AUDIO, next.defaultAudio.name)
+            putString(KEY_IMAGE, next.defaultImage.name)
+            putBoolean(KEY_KEEP_METADATA, next.keepMetadata)
+            putString(KEY_THEME, next.theme.name)
+            putString(KEY_FOLDER_VIDEO, next.folderVideo)
+            putString(KEY_FOLDER_AUDIO, next.folderAudio)
+            putString(KEY_FOLDER_IMAGE, next.folderImage)
+            putBoolean(KEY_THUMBNAILS, next.showThumbnails)
+        }
         _settings.value = next
     }
 

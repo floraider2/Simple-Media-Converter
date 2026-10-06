@@ -2,6 +2,7 @@ package com.simpleconverter.app.data
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.content.edit
 import com.simpleconverter.app.model.RecentItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,7 +52,7 @@ object RecentStore {
                     .put("time", it.timestamp)
             )
         }
-        prefs(context).edit().putString(KEY, array.toString()).apply()
+        prefs(context).edit { putString(KEY, array.toString()) }
     }
 
     @Synchronized
@@ -61,7 +62,7 @@ object RecentStore {
 
     @Synchronized
     fun clear(context: Context) {
-        prefs(context).edit().remove(KEY).apply()
+        prefs(context).edit { remove(KEY) }
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

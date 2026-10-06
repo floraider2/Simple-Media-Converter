@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
+import android.os.storage.StorageManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.CoroutineWorker
@@ -124,12 +125,12 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
     private fun hasRoomForPcm(durationMs: Long?): Boolean {
         val ms = durationMs ?: return false
         val bytes = ms / 1000 * 48_000L * 2 * 2
-        return applicationContext.cacheDir.usableSpace - RESERVE_BYTES > bytes
+        return freeCacheBytes(applicationContext) - RESERVE_BYTES > bytes
     }
 
     /**
-     * Wie viele Dateien gleichzeitig? Bilder und reine Audio-Ausgaben (MP3/Opus/FLAC/WAV) laufen
-     * auf der CPU und vertragen mehrere gleichzeitig; Video und M4A brauchen den Hardware-Encoder,
+     * Wie viele Dateien gleichzeitig? Bilder und reine Audio-Ausgaben (MP3/M4A/Opus/FLAC/WAV) laufen
+     * auf der CPU und vertragen mehrere gleichzeitig; Video braucht den Hardware-Encoder,
      * der nur einmal da ist. Bei Bildern begrenzt zusätzlich der Arbeitsspeicher (ein 12-MP-Foto
      * belegt dekodiert rund 50 MB).
      */
@@ -141,7 +142,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 val byMemory = (Runtime.getRuntime().maxMemory() / IMAGE_MEMORY_BUDGET).toInt()
                 minOf(4, cores / 2, byMemory)
             }
-            OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV -> minOf(2, cores / 2)
+            OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV, OutputFormat.M4A -> minOf(2, cores / 2)
             else -> 1
         }
         return byKind.coerceIn(1, count)
@@ -185,7 +186,7 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val toCopy = files.indices.filter { InputCache.needsCopy(context, files[it].uri) }
         if (toCopy.size < 2) return
         val needed = toCopy.sumOf { files[it].size }
-        val free = context.cacheDir.usableSpace - RESERVE_BYTES
+        val free = freeCacheBytes(context) - RESERVE_BYTES
         if (needed > free) return
         for (i in toCopy) {
             copies[i] = InputCache.copy(context, files[i].uri, files[i].name) { onProgress(i, it) }
@@ -216,7 +217,8 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
             val normalize = settings.normalizeLoudness && withAudio && settings.format.kind != MediaKind.IMAGE && !settings.passthrough
             val measureProgress: (Int) -> Unit = { onProgress(it * 40 / 100) }
             val convertProgress: (Int) -> Unit = if (normalize) { p -> onProgress(40 + p * 60 / 100) } else onProgress
-            val pcmPath = settings.format in PCM_FORMATS
+            // Reine Audio-Ziele laufen über den eigenen Weg (außer „Original-Ton“, das Media3 kopiert).
+            val pcmPath = settings.format in PCM_FORMATS || (settings.format == OutputFormat.M4A && !settings.passthrough)
             // Reines Audio-Ziel: beim Messen gleich eine WAV-Zwischendatei schreiben, dann wird die Quelle
             // nur einmal dekodiert. Nur wenn genug Platz frei ist (10 min Stereo ≈ 110 MB).
             val pcmFile = if (normalize && pcmPath && hasRoomForPcm(settings.trimmedDurationMs(file.durationMs))) {
@@ -230,10 +232,12 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
                     pcmFile != null -> Loudness.measureToWav(context, input, settings, pcmFile, measureProgress)
                     else -> Loudness.measureGainDb(context, input, settings, measureProgress)
                 }
-                when (settings.format) {
-                    OutputFormat.MP4, OutputFormat.WEBM, OutputFormat.M4A ->
+                when {
+                    settings.format.kind == MediaKind.IMAGE ->
+                        ImageConverter.convert(context, input, temp, settings)
+                    !pcmPath ->
                         VideoConverter.convert(context, input, temp, settings, file.durationMs, convertProgress, gainDb)
-                    OutputFormat.MP3, OutputFormat.OPUS, OutputFormat.FLAC, OutputFormat.WAV ->
+                    else ->
                         if (pcmFile != null) {
                             // Zwischendatei ist schon gekürzt.
                             AudioConverter.convert(
@@ -243,8 +247,6 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
                         } else {
                             AudioConverter.convert(context, input, temp, settings, convertProgress, gainDb)
                         }
-                    OutputFormat.JPG, OutputFormat.PNG, OutputFormat.WEBP ->
-                        ImageConverter.convert(context, input, temp, settings)
                 }
             } finally {
                 pcmFile?.delete()
@@ -317,6 +319,15 @@ class ConversionWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         const val PHASE_COPY = "copy"
         const val PHASE_CONVERT = "convert"
+
+        /**
+         * Freier Platz für den Cache – inklusive dessen, was Android bei Bedarf aus fremden Caches
+         * freiräumen würde. Notfalls der einfach freie Platz.
+         */
+        private fun freeCacheBytes(context: Context): Long = runCatching {
+            val storage = context.getSystemService(StorageManager::class.java)
+            storage.getAllocatableBytes(storage.getUuidForPath(context.cacheDir))
+        }.getOrElse { context.cacheDir.usableSpace }
 
         /** So viel Platz bleibt beim Vorab-Kopieren mindestens frei. */
         private const val RESERVE_BYTES = 500L * 1024 * 1024

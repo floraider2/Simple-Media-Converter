@@ -130,6 +130,7 @@
     <string name="err_image_unsupported">Dieses Bildformat kann dein Gerät nicht lesen.</string>
     <string name="err_unexpected">Unerwarteter Fehler (%s). Versuche andere Einstellungen.</string>
     <string name="err_cannot_read_format">Dein Gerät kann dieses Format nicht lesen.</string>
+    <string name="err_cannot_open_file">Die Datei lässt sich nicht öffnen. Sie ist beschädigt oder hat ein Format, das dein Gerät nicht kennt.</string>
     <string name="err_cannot_encode">Dein Gerät kann mit diesen Einstellungen nicht speichern. Versuche eine kleinere Auflösung.</string>
     <string name="err_cannot_write_output">Die Ergebnisdatei konnte nicht geschrieben werden.</string>
     <string name="err_export_failed">Umwandlung fehlgeschlagen (%s).</string>

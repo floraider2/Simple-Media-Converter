@@ -9,6 +9,7 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import com.simpleconverter.app.R
 import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
@@ -25,7 +26,7 @@ object OutputStore {
      */
     fun save(context: Context, file: File, displayName: String, format: OutputFormat, folder: String? = null): Uri {
         if (folder != null) {
-            runCatching { return saveToTree(context, file, displayName, format, Uri.parse(folder)) }
+            runCatching { return saveToTree(context, file, displayName, format, folder.toUri()) }
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             saveToMediaStore(context, file, displayName, format)
@@ -51,7 +52,7 @@ object OutputStore {
     /** Anzeigename eines Ordners, z. B. „Download/Konvertiert“; null = Standardordner. */
     fun folderLabel(folder: String?): String? {
         if (folder == null) return null
-        val id = runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(folder)) }.getOrNull() ?: return folder
+        val id = runCatching { DocumentsContract.getTreeDocumentId(folder.toUri()) }.getOrNull() ?: return folder
         return id.substringAfter(':').ifEmpty { id.substringBefore(':') }
     }
 

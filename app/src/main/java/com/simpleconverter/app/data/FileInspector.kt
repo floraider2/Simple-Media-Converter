@@ -54,13 +54,13 @@ object FileInspector {
         )
     }
 
-    private class Tracks(val video: String?, val audio: String?)
+    internal class Tracks(val video: String?, val audio: String?)
 
     /**
      * Codecs der ersten Bild- und Tonspur. Zählt die Spuren selbst – METADATA_KEY_HAS_AUDIO ist
      * nicht auf allen Geräten zuverlässig (Samsung liefert bei Bildschirmaufnahmen null).
      */
-    private fun trackMimes(context: Context, uri: Uri): Tracks? {
+    internal fun trackMimes(context: Context, uri: Uri): Tracks? {
         val extractor = MediaExtractor()
         return try {
             extractor.setDataSource(context, uri, null)

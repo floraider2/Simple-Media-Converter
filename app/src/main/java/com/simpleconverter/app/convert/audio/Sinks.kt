@@ -1,6 +1,7 @@
 package com.simpleconverter.app.convert.audio
 
 import android.media.MediaCodec
+import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.media.MediaMuxer
@@ -379,6 +380,45 @@ class OpusSink(output: File, private val bitrate: Int) : EncoderSink(MediaFormat
     }
 }
 
+/**
+ * AAC in einem MP4-Container (.m4a) über den Encoder des Systems.
+ * Schneller als der Weg über Media3 Transformer: Dekodieren und Kodieren laufen parallel (siehe [PipelineSink]).
+ */
+class AacSink(output: File, private val bitrate: Int) : EncoderSink(MediaFormat.MIMETYPE_AUDIO_AAC) {
+    private val muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    private var track = -1
+
+    override fun configure(format: MediaFormat) {
+        format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate.coerceIn(32_000, 320_000))
+        format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+    }
+
+    override fun onOutputFormat(format: MediaFormat) {
+        track = muxer.addTrack(format)
+        muxer.start()
+    }
+
+    override fun onEncoded(data: ByteBuffer, info: MediaCodec.BufferInfo) {
+        if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0 || track < 0) return
+        muxer.writeSampleData(track, data, info)
+    }
+
+    override fun finish() {
+        super.finish()
+        if (track >= 0) muxer.stop()
+    }
+
+    override fun release() {
+        super.release()
+        runCatching { muxer.release() }
+    }
+
+    companion object {
+        /** Samplerates, die jeder AAC-Encoder annimmt. */
+        val SAMPLE_RATES = setOf(8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000)
+    }
+}
+
 // ───────────────────────── Vorverarbeitung ─────────────────────────
 
 /** Mischt Mehrkanal-Ton (z. B. 5.1) auf Stereo herunter. */
@@ -430,7 +470,7 @@ class Resampler(private val targetRate: (Int) -> Int, private val next: PcmSink)
             sonic = SonicAudioProcessor().apply {
                 setOutputSampleRateHz(target)
                 configure(AudioProcessor.AudioFormat(sampleRate, channels, C.ENCODING_PCM_16BIT))
-                flush()
+                flush(AudioProcessor.StreamMetadata.DEFAULT)
             }
         }
         next.start(target, channels)

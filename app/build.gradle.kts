@@ -2,20 +2,20 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.baselineprofile)
 }
 
 android {
     namespace = "com.simpleconverter.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.simpleconverter.app"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 5
-        versionName = "0.5.0"
+        targetSdk = 37
+        versionCode = 6
+        versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Leistungsmessungen (@LargeTest) laufen nur gezielt, nicht bei jedem Testlauf:
         // ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.simpleconverter.app.PerfTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.FlakyTest
@@ -68,19 +68,16 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
-    ndkVersion = "27.2.12479018"
+    ndkVersion = "30.0.16248370"
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            version = "4.1.2"
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
     }
     androidResources {
         // Sprachwahl pro App (Android 13+): Liste der Sprachen aus den values-*-Ordnern.
@@ -103,18 +100,42 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    // Material 3 bringt die Symbole nicht mehr selbst mit.
+    implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.media3.transformer)
     implementation(libs.androidx.media3.effect)
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.inspector) // MediaExtractorCompat
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.muxer)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.exifinterface)
+    // Installiert das mitgelieferte Baseline Profile, damit der Start ohne Vorlauf schnell ist.
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.uiautomator)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+// Varianten für das Baseline Profile (vom Plugin angelegt) bekommen einen eigenen Paketnamen:
+// Sonst würde der Messlauf die installierte App ersetzen und am Ende deinstallieren.
+// (Über die Variant-API, weil das Plugin applicationIdSuffix der Build-Typen überschreibt.)
+androidComponents {
+    onVariants { variant ->
+        val type = variant.buildType ?: return@onVariants
+        if (type.startsWith("nonMinified") || type.startsWith("benchmark")) {
+            variant.applicationId.set("com.simpleconverter.app.benchmark")
+        }
+    }
 }
