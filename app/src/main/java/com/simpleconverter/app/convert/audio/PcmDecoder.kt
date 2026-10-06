@@ -6,11 +6,12 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ConversionException
-import kotlinx.coroutines.ensureActive
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Ziel für dekodiertes Audio: 16-Bit-PCM, verschachtelt (L R L R …), Little Endian.
@@ -39,7 +40,7 @@ object PcmDecoder {
             extractor.setDataSource(context, input, null)
             val track = (0 until extractor.trackCount).firstOrNull {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-            } ?: throw ConversionException("Die Datei enthält keine Tonspur.")
+            } ?: throw ConversionException(R.string.err_no_audio_track)
             extractor.selectTrack(track)
             val inputFormat = extractor.getTrackFormat(track)
             val durationUs = if (inputFormat.containsKey(MediaFormat.KEY_DURATION)) inputFormat.getLong(MediaFormat.KEY_DURATION) else 0L
@@ -99,7 +100,7 @@ object PcmDecoder {
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
                 }
             }
-            if (!started) throw ConversionException("Die Tonspur ist leer.")
+            if (!started) throw ConversionException(R.string.err_empty_audio_track)
             sink.finish()
         } finally {
             runCatching { codec?.stop() }

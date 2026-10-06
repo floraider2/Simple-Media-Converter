@@ -10,13 +10,14 @@ import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
+import com.simpleconverter.app.R
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.OutputFormat
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Bilder über die Bord-APIs des Systems. Beim Neu-Kodieren gehen EXIF-Daten
@@ -36,7 +37,7 @@ object ImageConverter {
             try {
                 output.outputStream().use { stream ->
                     val ok = bitmap.compress(compressFormat(settings.format), settings.imageQuality, stream)
-                    if (!ok) throw ConversionException("Bild konnte nicht gespeichert werden.")
+                    if (!ok) throw ConversionException(R.string.err_image_save)
                 }
             } finally {
                 bitmap.recycle()
@@ -101,7 +102,7 @@ object ImageConverter {
         }
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         var bitmap = resolver.openInputStream(input)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: throw ConversionException("Bildformat wird auf diesem Gerät nicht unterstützt.")
+            ?: throw ConversionException(R.string.err_image_unsupported)
 
         val rotation = runCatching {
             resolver.openInputStream(input)?.use { ExifInterface(it).rotationDegrees } ?: 0
@@ -140,6 +141,6 @@ object ImageConverter {
         } else {
             Bitmap.CompressFormat.WEBP
         }
-        else -> error("Kein Bildformat: $format")
+        else -> error("Not an image format: $format")
     }
 }

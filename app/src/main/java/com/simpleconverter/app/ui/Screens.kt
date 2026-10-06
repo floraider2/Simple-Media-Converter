@@ -69,23 +69,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.simpleconverter.app.R
+import com.simpleconverter.app.convert.Encoders
 import com.simpleconverter.app.data.formatDuration
 import com.simpleconverter.app.data.formatSize
-import com.simpleconverter.app.convert.Encoders
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.FileResult
-import com.simpleconverter.app.model.commonTargets
 import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.MediaKind
 import com.simpleconverter.app.model.OutputFormat
 import com.simpleconverter.app.model.Presets
 import com.simpleconverter.app.model.RecentItem
+import com.simpleconverter.app.model.commonTargets
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -114,11 +117,11 @@ fun ConverterApp(vm: ConverterViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (screen is Screen.Home) "Simple Converter" else titleFor(screen)) },
+                title = { Text(if (screen is Screen.Home) stringResource(R.string.app_name) else titleFor(screen)) },
                 navigationIcon = {
                     if (screen !is Screen.Home && screen !is Screen.Working) {
                         IconButton(onClick = vm::goHome) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
                     }
                 },
@@ -139,11 +142,13 @@ fun ConverterApp(vm: ConverterViewModel) {
     }
 }
 
+@Composable
 private fun titleFor(screen: Screen) = when (screen) {
-    is Screen.Setup -> if (screen.files.size == 1) screen.files.first().name else "${screen.files.size} Dateien"
-    is Screen.Working -> "Wird umgewandelt …"
-    is Screen.Done -> "Fertig"
-    is Screen.Failed -> "Fehler"
+    is Screen.Setup -> if (screen.files.size == 1) screen.files.first().name
+    else pluralStringResource(R.plurals.n_files, screen.files.size, screen.files.size)
+    is Screen.Working -> stringResource(R.string.title_working)
+    is Screen.Done -> stringResource(R.string.title_done)
+    is Screen.Failed -> stringResource(R.string.title_error)
     Screen.Home -> ""
 }
 
@@ -178,9 +183,9 @@ private fun HomeScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             ) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Was möchtest du umwandeln?", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.home_question), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Video, Audio oder Bild – alles bleibt auf deinem Gerät.",
+                        stringResource(R.string.home_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Button(
@@ -188,17 +193,17 @@ private fun HomeScreen(
                             mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("🖼️  Aus der Galerie wählen") }
+                    ) { Text(stringResource(R.string.home_pick_gallery)) }
                     FilledTonalButton(
                         onClick = { documentPicker.launch(arrayOf("video/*", "audio/*", "image/*")) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(8.dp))
-                        Text("Datei suchen (auch Musik)")
+                        Text(stringResource(R.string.home_pick_file))
                     }
                     Text(
-                        "Mehrere Dateien auf einmal? Einfach mehrere auswählen.",
+                        stringResource(R.string.home_multiple_hint),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -207,7 +212,7 @@ private fun HomeScreen(
         }
         item {
             Text(
-                "Tipp: Du kannst Dateien auch aus WhatsApp, der Galerie oder dem Dateimanager direkt an „Simple Converter“ teilen.",
+                stringResource(R.string.home_share_tip),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -215,8 +220,8 @@ private fun HomeScreen(
         if (recents.isNotEmpty()) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Zuletzt", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    TextButton(onClick = onClearRecents) { Text("Leeren") }
+                    Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onClearRecents) { Text(stringResource(R.string.home_clear)) }
                 }
             }
             items(recents, key = { it.timestamp }) { item ->
@@ -272,26 +277,25 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
         if (s.files.size == 1) FileHeader(first) else BatchHeader(s.files, vm::removeFile)
         if (s.files.any { it.kind == MediaKind.VIDEO && !it.hasAudio }) {
             Text(
-                if (s.files.size == 1) "Dieses Video hat keine Tonspur."
-                else "Mindestens ein Video hat keine Tonspur, deshalb gibt es kein „Nur Ton“.",
+                stringResource(if (s.files.size == 1) R.string.setup_no_audio_single else R.string.setup_no_audio_batch),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        Section("Zielformat") {
+        Section(stringResource(R.string.setup_target_format)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 commonTargets(s.files).forEach { format ->
                     FilterChip(
                         selected = format == s.format,
                         onClick = { vm.selectFormat(format) },
-                        label = { Text(if (first.kind == MediaKind.VIDEO && format.kind == MediaKind.AUDIO) "Nur Ton: ${format.label}" else format.label) },
+                        label = { Text(if (first.kind == MediaKind.VIDEO && format.kind == MediaKind.AUDIO) stringResource(R.string.setup_audio_only, format.label) else format.label) },
                     )
                 }
             }
         }
 
-        Section("Vorgabe") {
+        Section(stringResource(R.string.setup_preset)) {
             Column {
                 presets.forEach { preset ->
                     Row(
@@ -308,9 +312,10 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
                         RadioButton(selected = preset.id == s.presetId, onClick = null)
                         Spacer(Modifier.size(12.dp))
                         Column {
-                            Text(preset.label)
+                            Text(stringResource(preset.label))
                             Text(
-                                preset.description,
+                                preset.descriptionArg?.let { stringResource(preset.description, it) }
+                                    ?: stringResource(preset.description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -321,7 +326,7 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = true, onClick = null)
                         Spacer(Modifier.size(12.dp))
-                        Text("Eigene Einstellungen")
+                        Text(stringResource(R.string.setup_custom))
                     }
                 }
             }
@@ -336,7 +341,7 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Erweitert", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.setup_advanced), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Icon(if (advanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null)
             }
             AnimatedVisibility(advanced) {
@@ -352,8 +357,7 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
 
         if (first.kind == MediaKind.IMAGE) {
             Text(
-                if (s.settings.keepMetadata) "🔒 Der Standort wird entfernt, Kameradaten bleiben erhalten."
-                else "🔒 Standort, Kameradaten und andere EXIF-Infos werden beim Umwandeln entfernt.",
+                stringResource(if (s.settings.keepMetadata) R.string.setup_privacy_keep else R.string.setup_privacy_strip),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -368,7 +372,10 @@ private fun SetupScreen(s: Screen.Setup, vm: ConverterViewModel, modifier: Modif
             .padding(16.dp)
             .height(52.dp),
     ) {
-        Text(if (s.files.size == 1) "Umwandeln" else "${s.files.size} Dateien umwandeln")
+        Text(
+            if (s.files.size == 1) stringResource(R.string.setup_convert)
+            else pluralStringResource(R.plurals.setup_convert_n, s.files.size, s.files.size),
+        )
     }
     }
 }
@@ -389,55 +396,55 @@ private fun AdvancedOptions(
             OutputFormat.MP4, OutputFormat.WEBM -> {
                 if (format == OutputFormat.MP4 && Encoders.hevc) {
                     ChipGroup(
-                        "Codec",
-                        listOf(false to "H.264 (überall)", true to "H.265 (kleiner)"),
+                        stringResource(R.string.adv_codec),
+                        listOf(false to stringResource(R.string.adv_h264), true to stringResource(R.string.adv_h265)),
                         settings.hevc,
                     ) { v -> update { it.copy(hevc = v ?: false) } }
                 }
                 ChipGroup(
-                    "Auflösung",
-                    listOf(null to "Original", 1080 to "1080p", 720 to "720p", 480 to "480p"),
+                    stringResource(R.string.adv_resolution),
+                    listOf(null to stringResource(R.string.original), 1080 to "1080p", 720 to "720p", 480 to "480p"),
                     settings.videoShortSide,
                 ) { v -> update { it.copy(videoShortSide = v) } }
                 if (allHaveDuration) {
                     val mb = 1024L * 1024L
                     ChipGroup(
-                        "Zielgröße",
-                        listOf(null to "Aus", 8 * mb to "< 8 MB", 16 * mb to "< 16 MB", 24 * mb to "< 25 MB", 50 * mb to "< 50 MB"),
+                        stringResource(R.string.adv_target_size),
+                        listOf(null to stringResource(R.string.off), 8 * mb to "< 8 MB", 16 * mb to "< 16 MB", 24 * mb to "< 25 MB", 50 * mb to "< 50 MB"),
                         settings.targetSizeBytes,
                     ) { v -> update { it.copy(targetSizeBytes = v) } }
                 }
                 if (settings.targetSizeBytes == null) {
                     ChipGroup(
-                        "Video-Bitrate",
-                        listOf(700_000 to "0,7 Mbit/s", 2_000_000 to "2 Mbit/s", 5_000_000 to "5 Mbit/s", 12_000_000 to "12 Mbit/s"),
+                        stringResource(R.string.adv_video_bitrate),
+                        listOf(700_000 to stringResource(R.string.adv_mbit_0_7), 2_000_000 to "2 Mbit/s", 5_000_000 to "5 Mbit/s", 12_000_000 to "12 Mbit/s"),
                         settings.videoBitrate,
                     ) { v -> update { it.copy(videoBitrate = v) } }
                 }
                 if (allHaveAudio) {
-                    SwitchRow("Ton entfernen", null, settings.removeAudio) { c -> update { it.copy(removeAudio = c) } }
+                    SwitchRow(stringResource(R.string.adv_remove_audio), null, settings.removeAudio) { c -> update { it.copy(removeAudio = c) } }
                     if (!settings.removeAudio) AudioBitrateChips(settings, update)
                 }
             }
             OutputFormat.M4A, OutputFormat.MP3 -> AudioBitrateChips(settings, update)
             OutputFormat.OPUS -> ChipGroup(
-                "Audio-Bitrate",
+                stringResource(R.string.adv_audio_bitrate),
                 listOf(32_000 to "32k", 64_000 to "64k", 96_000 to "96k", 128_000 to "128k", 192_000 to "192k"),
                 settings.audioBitrate,
             ) { v -> if (v != null) update { it.copy(audioBitrate = v) } }
             OutputFormat.JPG, OutputFormat.WEBP, OutputFormat.PNG -> {
                 ChipGroup(
-                    "Maximale Größe (längste Seite)",
-                    listOf(null to "Original", 3840 to "3840 px", 1920 to "1920 px", 1600 to "1600 px", 1280 to "1280 px"),
+                    stringResource(R.string.adv_max_size),
+                    listOf(null to stringResource(R.string.original), 3840 to "3840 px", 1920 to "1920 px", 1600 to "1600 px", 1280 to "1280 px"),
                     settings.imageMaxSide,
                 ) { v -> update { it.copy(imageMaxSide = v) } }
                 SwitchRow(
-                    "Kameradaten behalten",
-                    "Aufnahmezeit, Kamera, Belichtung – der Standort wird trotzdem entfernt",
+                    stringResource(R.string.adv_keep_metadata),
+                    stringResource(R.string.adv_keep_metadata_hint),
                     settings.keepMetadata,
                 ) { c -> update { it.copy(keepMetadata = c) } }
                 if (format != OutputFormat.PNG) {
-                    Text("Qualität: ${settings.imageQuality}", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.adv_quality, settings.imageQuality), style = MaterialTheme.typography.labelLarge)
                     Slider(
                         value = settings.imageQuality.toFloat(),
                         onValueChange = { v -> update { it.copy(imageQuality = v.roundToInt()) } },
@@ -473,7 +480,7 @@ private fun SwitchRow(title: String, subtitle: String?, checked: Boolean, onChan
 @Composable
 private fun AudioBitrateChips(settings: ConversionSettings, update: ((ConversionSettings) -> ConversionSettings) -> Unit) {
     ChipGroup(
-        "Audio-Bitrate",
+        stringResource(R.string.adv_audio_bitrate),
         listOf(96_000 to "96k", 128_000 to "128k", 192_000 to "192k", 256_000 to "256k", 320_000 to "320k"),
         settings.audioBitrate,
     ) { v -> if (v != null) update { it.copy(audioBitrate = v) } }
@@ -521,9 +528,9 @@ private fun BatchHeader(files: List<InputFile>, onRemove: (InputFile) -> Unit) {
                 Text(emojiFor(files.first().kind), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.size(16.dp))
                 Column {
-                    Text("${files.size} Dateien", style = MaterialTheme.typography.titleMedium)
+                    Text(pluralStringResource(R.plurals.n_files, files.size, files.size), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "zusammen ${formatSize(files.sumOf { it.size })}",
+                        stringResource(R.string.batch_total, formatSize(files.sumOf { it.size })),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -540,13 +547,13 @@ private fun BatchHeader(files: List<InputFile>, onRemove: (InputFile) -> Unit) {
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = { onRemove(file) }) {
-                        Icon(Icons.Default.Close, contentDescription = "${file.name} entfernen")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.batch_remove, file.name))
                     }
                 }
             }
             if (files.size > 3) {
                 TextButton(onClick = { expanded = !expanded }) {
-                    Text(if (expanded) "Weniger anzeigen" else "Alle ${files.size} anzeigen")
+                    Text(if (expanded) stringResource(R.string.batch_show_less) else stringResource(R.string.batch_show_all, files.size))
                 }
             }
         }
@@ -573,11 +580,11 @@ private fun WorkingScreen(s: Screen.Working, onCancel: () -> Unit, modifier: Mod
         val current = s.files.getOrElse(s.index) { s.files.first() }
         Text(emojiFor(current.kind), style = MaterialTheme.typography.displayMedium)
         if (s.files.size > 1) {
-            Text("Datei ${s.index + 1} von ${s.files.size}", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.working_file_n, s.index + 1, s.files.size), style = MaterialTheme.typography.titleMedium)
         }
         Text("${current.name} → ${s.format.label}", textAlign = TextAlign.Center)
         if (s.preparing) {
-            Text("Datei wird vorbereitet …", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.working_preparing), style = MaterialTheme.typography.bodyMedium)
         }
         if (s.overall > 0) {
             LinearProgressIndicator(progress = { s.overall / 100f }, modifier = Modifier.fillMaxWidth())
@@ -586,12 +593,12 @@ private fun WorkingScreen(s: Screen.Working, onCancel: () -> Unit, modifier: Mod
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
         Text(
-            "Du kannst die App verlassen – der Fortschritt steht in der Benachrichtigung.",
+            stringResource(R.string.working_leave_hint),
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(onClick = onCancel) { Text("Abbrechen") }
+        OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
     }
 }
 
@@ -608,6 +615,7 @@ private fun DoneScreen(s: Screen.Done, vm: ConverterViewModel, modifier: Modifie
 @Composable
 private fun SingleDone(r: FileResult, onAnother: () -> Unit, onSaveAs: (Uri) -> Unit, modifier: Modifier) {
     val context = LocalContext.current
+    val defaultName = stringResource(R.string.default_file_name)
     val saveAs = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(r.mimeType)) { uri ->
         uri?.let(onSaveAs)
     }
@@ -621,8 +629,7 @@ private fun SingleDone(r: FileResult, onAnother: () -> Unit, onSaveAs: (Uri) -> 
         Text("${formatSize(r.inputSize)} → ${formatSize(r.outputSize)}", style = MaterialTheme.typography.titleMedium)
         if (r.outputSize > r.inputSize) {
             Text(
-                "Die neue Datei ist größer als das Original – das Original war schon stark komprimiert. " +
-                    "Für eine kleinere Datei probiere „Kleinste Datei“ oder ein anderes Format.",
+                stringResource(R.string.done_bigger_hint),
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -632,12 +639,12 @@ private fun SingleDone(r: FileResult, onAnother: () -> Unit, onSaveAs: (Uri) -> 
             Button(onClick = { shareOutputs(context, listOf(r.outputUri!!), r.mimeType) }) {
                 Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("Teilen")
+                Text(stringResource(R.string.share))
             }
-            FilledTonalButton(onClick = { openOutput(context, r.outputUri!!, r.mimeType) }) { Text("Öffnen") }
+            FilledTonalButton(onClick = { openOutput(context, r.outputUri!!, r.mimeType) }) { Text(stringResource(R.string.open)) }
         }
-        OutlinedButton(onClick = { saveAs.launch(r.outputName ?: "umgewandelt") }) { Text("Speichern unter …") }
-        TextButton(onClick = onAnother) { Text("Noch eine Datei") }
+        OutlinedButton(onClick = { saveAs.launch(r.outputName ?: defaultName) }) { Text(stringResource(R.string.save_as)) }
+        TextButton(onClick = onAnother) { Text(stringResource(R.string.another_file)) }
     }
 }
 
@@ -668,7 +675,8 @@ private fun BatchDone(results: List<FileResult>, onAnother: () -> Unit, onSaveAl
                     modifier = Modifier.size(56.dp),
                 )
                 Text(
-                    if (allOk) "${results.size} Dateien fertig" else "${ok.size} von ${results.size} Dateien fertig",
+                    if (allOk) pluralStringResource(R.plurals.done_all, results.size, results.size)
+                    else stringResource(R.string.done_some, ok.size, results.size),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 if (ok.isNotEmpty()) {
@@ -679,11 +687,11 @@ private fun BatchDone(results: List<FileResult>, onAnother: () -> Unit, onSaveAl
                     Button(onClick = { shareOutputs(context, ok.map { it.outputUri!! }, ok.first().mimeType) }) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(8.dp))
-                        Text("Alle teilen")
+                        Text(stringResource(R.string.share_all))
                     }
-                    OutlinedButton(onClick = { pickFolder.launch(null) }) { Text("Alle in Ordner speichern …") }
+                    OutlinedButton(onClick = { pickFolder.launch(null) }) { Text(stringResource(R.string.save_all)) }
                 }
-                TextButton(onClick = onAnother) { Text("Noch eine Datei") }
+                TextButton(onClick = onAnother) { Text(stringResource(R.string.another_file)) }
             }
         }
         items(results) { r ->
@@ -704,7 +712,7 @@ private fun BatchDone(results: List<FileResult>, onAnother: () -> Unit, onSaveAl
                 }
                 Icon(
                     if (r.ok) Icons.Default.CheckCircle else Icons.Default.Warning,
-                    contentDescription = if (r.ok) "fertig" else "fehlgeschlagen",
+                    contentDescription = stringResource(if (r.ok) R.string.cd_done else R.string.cd_failed),
                     tint = if (r.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 )
             }
@@ -721,10 +729,10 @@ private fun FailedScreen(s: Screen.Failed, onRetry: () -> Unit, onHome: () -> Un
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(72.dp))
-        Text("Das hat nicht geklappt.", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.failed_title), style = MaterialTheme.typography.titleLarge)
         Text(s.message, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = onRetry) { Text("Andere Einstellungen versuchen") }
-        TextButton(onClick = onHome) { Text("Zum Start") }
+        Button(onClick = onRetry) { Text(stringResource(R.string.failed_retry)) }
+        TextButton(onClick = onHome) { Text(stringResource(R.string.to_start)) }
     }
 }
 
@@ -749,7 +757,7 @@ private fun shareOutputs(context: Context, uris: List<Uri>, mime: String) {
         Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
     }
     send.setType(mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    context.startActivity(Intent.createChooser(send, "Teilen"))
+    context.startActivity(Intent.createChooser(send, context.getString(R.string.share)))
 }
 
 /** Obergrenze für die Mehrfachauswahl im Photo Picker. */
@@ -762,8 +770,8 @@ private fun openOutput(context: Context, uri: Uri, mime: String) {
     try {
         context.startActivity(view)
     } catch (e: ActivityNotFoundException) {
-        Toast.makeText(context, "Keine App zum Öffnen gefunden.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
     } catch (e: SecurityException) {
-        Toast.makeText(context, "Datei ist nicht mehr verfügbar.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.file_gone, Toast.LENGTH_SHORT).show()
     }
 }

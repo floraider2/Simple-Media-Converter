@@ -25,10 +25,10 @@ object Notifications {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_PROGRESS, "Umwandlung läuft", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_PROGRESS, context.getString(R.string.channel_progress), NotificationManager.IMPORTANCE_LOW)
         )
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_RESULT, "Umwandlung fertig", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CHANNEL_RESULT, context.getString(R.string.channel_result), NotificationManager.IMPORTANCE_DEFAULT)
         )
     }
 
@@ -42,7 +42,7 @@ object Notifications {
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setContentIntent(openApp(context))
-            .addAction(0, "Abbrechen", cancel)
+            .addAction(0, context.getString(R.string.cancel), cancel)
             .build()
 
     fun done(context: Context, name: String, detail: String, uri: Uri, mime: String) {
@@ -55,26 +55,27 @@ object Notifications {
                 .setType(mime)
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-            "Teilen",
+            context.getString(R.string.share),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val open = PendingIntent.getActivity(context, 1, view, flags)
         post(
             context,
             NotificationCompat.Builder(context, CHANNEL_RESULT)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("Fertig: $name")
+                .setContentTitle(context.getString(R.string.notif_done, name))
                 .setContentText(detail)
                 .setAutoCancel(true)
                 .setContentIntent(open)
-                .addAction(0, "Öffnen", open)
-                .addAction(0, "Teilen", PendingIntent.getActivity(context, 2, share, flags))
+                .addAction(0, context.getString(R.string.open), open)
+                .addAction(0, context.getString(R.string.share), PendingIntent.getActivity(context, 2, share, flags))
                 .build(),
         )
     }
 
     fun batchDone(context: Context, ok: Int, total: Int, detail: String) {
-        val title = if (ok == total) "$total Dateien fertig" else "$ok von $total Dateien fertig"
-        val text = if (ok == total) detail else "${total - ok} fehlgeschlagen · $detail"
+        val title = if (ok == total) context.resources.getQuantityString(R.plurals.done_all, total, total)
+        else context.getString(R.string.done_some, ok, total)
+        val text = if (ok == total) detail else context.getString(R.string.notif_failed_count, total - ok, detail)
         post(
             context,
             NotificationCompat.Builder(context, CHANNEL_RESULT)
@@ -92,7 +93,7 @@ object Notifications {
             context,
             NotificationCompat.Builder(context, CHANNEL_RESULT)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("Fehlgeschlagen: $name")
+                .setContentTitle(context.getString(R.string.notif_failed, name))
                 .setContentText(message)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(message))
                 .setAutoCancel(true)

@@ -1,5 +1,6 @@
 package com.simpleconverter.app.work
 
+import android.content.Context
 import android.graphics.ImageDecoder
 import android.os.Build
 import android.system.ErrnoException
@@ -7,6 +8,7 @@ import android.system.OsConstants
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.ExportException
+import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ConversionException
 import java.io.FileNotFoundException
 
@@ -14,42 +16,45 @@ import java.io.FileNotFoundException
 @OptIn(UnstableApi::class)
 object ErrorMessages {
 
-    fun forThrowable(t: Throwable): String {
+    fun forThrowable(context: Context, t: Throwable): String {
         val chain = generateSequence(t) { it.cause }.toList()
 
-        chain.firstOrNull { it is ConversionException }?.message?.let { return it }
-        chain.firstOrNull { it is ExportException }?.let { return forExport(it as ExportException) }
+        (chain.firstOrNull { it is ConversionException } as ConversionException?)?.let {
+            return context.getString(it.messageRes, *it.args)
+        }
+        chain.firstOrNull { it is ExportException }?.let { return context.getString(forExport(it as ExportException), (it as ExportException).errorCodeName) }
 
         if (chain.any { it is OutOfMemoryError }) {
-            return "Die Datei ist zu groß für den Arbeitsspeicher. Wähle unter „Erweitert“ eine kleinere Größe."
+            return context.getString(R.string.err_out_of_memory)
         }
         if (chain.any { isNoSpace(it) }) {
-            return "Nicht genug Speicherplatz frei."
+            return context.getString(R.string.err_no_space)
         }
         if (chain.any { it is SecurityException || it is FileNotFoundException }) {
-            return "Die Datei ist nicht mehr erreichbar. Bitte erneut auswählen."
+            return context.getString(R.string.err_file_unreachable)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && chain.any { it is ImageDecoder.DecodeException }) {
-            return "Dieses Bildformat kann dein Gerät nicht lesen."
+            return context.getString(R.string.err_image_unsupported)
         }
-        return "Unerwarteter Fehler (${t.javaClass.simpleName}). Versuche andere Einstellungen."
+        return context.getString(R.string.err_unexpected, t.javaClass.simpleName)
     }
 
-    private fun forExport(e: ExportException): String = when (e.errorCode) {
+    /** Text-ID; err_export_failed bekommt den Fehlercode als Argument, die anderen ignorieren es. */
+    private fun forExport(e: ExportException): Int = when (e.errorCode) {
         ExportException.ERROR_CODE_DECODER_INIT_FAILED,
         ExportException.ERROR_CODE_DECODING_FAILED,
         ExportException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
-            "Dein Gerät kann dieses Format nicht lesen."
+            R.string.err_cannot_read_format
         ExportException.ERROR_CODE_ENCODER_INIT_FAILED,
         ExportException.ERROR_CODE_ENCODING_FAILED,
         ExportException.ERROR_CODE_ENCODING_FORMAT_UNSUPPORTED ->
-            "Dein Gerät kann mit diesen Einstellungen nicht speichern. Versuche eine kleinere Auflösung."
+            R.string.err_cannot_encode
         ExportException.ERROR_CODE_IO_FILE_NOT_FOUND,
         ExportException.ERROR_CODE_IO_NO_PERMISSION ->
-            "Die Datei ist nicht mehr erreichbar. Bitte erneut auswählen."
+            R.string.err_file_unreachable
         ExportException.ERROR_CODE_MUXING_FAILED ->
-            "Die Ergebnisdatei konnte nicht geschrieben werden."
-        else -> "Umwandlung fehlgeschlagen (${e.errorCodeName})."
+            R.string.err_cannot_write_output
+        else -> R.string.err_export_failed
     }
 
     private fun isNoSpace(t: Throwable): Boolean =

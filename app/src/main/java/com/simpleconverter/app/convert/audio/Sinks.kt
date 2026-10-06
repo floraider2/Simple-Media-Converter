@@ -10,6 +10,7 @@ import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.util.UnstableApi
+import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ConversionException
 import java.io.File
 import java.io.RandomAccessFile
@@ -100,7 +101,7 @@ abstract class EncoderSink(private val mime: String) : PcmSink {
         codec = try {
             MediaCodec.createEncoderByType(mime)
         } catch (e: Exception) {
-            throw ConversionException("Dein Gerät kann dieses Audioformat nicht erzeugen.")
+            throw ConversionException(R.string.err_audio_encoder_missing)
         }
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         codec.start()
@@ -194,7 +195,7 @@ class FlacSink(private val output: File, private val compressionLevel: Int = 5) 
             // Manche Encoder liefern nur STREAMINFO ohne die Kennung „fLaC“.
             if (!bytes.startsWith(FLAC_MAGIC)) out.write(FLAC_MAGIC)
         } else if (!headerWritten) {
-            throw ConversionException("FLAC-Encoder lieferte keinen Dateikopf.")
+            throw ConversionException(R.string.err_flac_header)
         }
         out.write(bytes)
     }

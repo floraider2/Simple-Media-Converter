@@ -4,11 +4,14 @@ import android.app.Application
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.OutputStore
 import com.simpleconverter.app.data.FileInspector
 import com.simpleconverter.app.data.RecentStore
@@ -22,6 +25,7 @@ import com.simpleconverter.app.model.commonTargets
 import com.simpleconverter.app.work.ConversionWorker
 import com.simpleconverter.app.work.JobStore
 import com.simpleconverter.app.work.Notifications
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +33,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.UUID
 
 sealed interface Screen {
     data object Home : Screen
@@ -101,7 +104,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (uris.isEmpty()) return
         if (_screen.value is Screen.Working) {
-            _message.value = "Es läuft bereits eine Umwandlung."
+            _message.value = str(R.string.msg_already_running)
             return
         }
         openFiles(uris)
@@ -120,12 +123,11 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             val targets = commonTargets(files)
             when {
                 files.isEmpty() ->
-                    _message.value = if (uris.size == 1) "Diese Datei ist kein Video, Audio oder Bild."
-                    else "Keine der Dateien ist ein Video, Audio oder Bild."
+                    _message.value = str(if (uris.size == 1) R.string.msg_not_media_single else R.string.msg_not_media_all)
                 targets.isEmpty() ->
-                    _message.value = "Bilder lassen sich nicht zusammen mit Videos oder Musik umwandeln. Bitte getrennt auswählen."
+                    _message.value = str(R.string.msg_mixed_kinds)
                 else -> {
-                    if (skipped > 0) _message.value = "$skipped Datei(en) übersprungen – kein Video, Audio oder Bild."
+                    if (skipped > 0) _message.value = plural(R.plurals.msg_skipped, skipped)
                     _screen.value = setupFor(files, targets.first())
                 }
             }
@@ -204,7 +206,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _message.value = withContext(Dispatchers.IO) {
                 runCatching { OutputStore.copy(getApplication(), from, target) }
-                    .fold({ "Gespeichert." }, { "Speichern fehlgeschlagen." })
+                    .fold({ str(R.string.msg_saved) }, { str(R.string.msg_save_failed) })
             }
         }
     }
@@ -216,7 +218,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             val copied = withContext(Dispatchers.IO) {
                 runCatching { OutputStore.copyToFolder(getApplication(), tree, files) }.getOrDefault(0)
             }
-            _message.value = if (copied == files.size) "$copied Dateien gespeichert." else "$copied von ${files.size} Dateien gespeichert."
+            _message.value = if (copied == files.size) plural(R.plurals.msg_saved_n, copied) else str(R.string.msg_saved_some, copied, files.size)
         }
     }
 
@@ -256,13 +258,13 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
                         observeJob?.cancel()
                     }
                     WorkInfo.State.FAILED -> {
-                        val error = info.outputData.getString(ConversionWorker.KEY_ERROR) ?: "Unbekannter Fehler"
+                        val error = info.outputData.getString(ConversionWorker.KEY_ERROR) ?: str(R.string.err_unknown)
                         _screen.value = Screen.Failed(files, error)
                         observeJob?.cancel()
                     }
                     WorkInfo.State.CANCELLED -> {
                         val done = withContext(Dispatchers.IO) { JobStore.loadResults(getApplication(), id) }.count { it.ok }
-                        _message.value = if (done > 0) "Abgebrochen – $done Datei(en) waren schon fertig." else "Umwandlung abgebrochen."
+                        _message.value = if (done > 0) plural(R.plurals.msg_cancelled_some_done, done) else str(R.string.msg_cancelled)
                         _screen.value = setupFor(files, format)
                         refreshRecents()
                         observeJob?.cancel()
@@ -282,6 +284,11 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    private fun str(@StringRes id: Int, vararg args: Any) = getApplication<Application>().getString(id, *args)
+
+    private fun plural(@PluralsRes id: Int, count: Int) =
+        getApplication<Application>().resources.getQuantityString(id, count, count)
 
     private fun setupFor(files: List<InputFile>, format: OutputFormat): Screen.Setup {
         val first = Presets.forFormat(format).first()

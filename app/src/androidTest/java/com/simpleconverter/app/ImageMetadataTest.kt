@@ -51,8 +51,8 @@ class ImageMetadataTest {
     fun standardmaessigWerdenAlleMetadatenEntfernt() {
         val name = "exif_aus_${System.currentTimeMillis()}"
         open(photoWithExif("$name.jpg"))
-        click("Umwandeln")
-        assertNotNull(device.wait(Until.findObject(By.text("Teilen")), 30_000))
+        click(context.getString(R.string.setup_convert))
+        assertNotNull(device.wait(Until.findObject(By.text(context.getString(R.string.share))), 30_000))
 
         val exif = readResult("$name.jpg")
         assertNull("Kamera hätte entfernt werden müssen", exif.getAttribute(ExifInterface.TAG_MAKE))
@@ -63,10 +63,10 @@ class ImageMetadataTest {
     fun kameradatenBleibenStandortNicht() {
         val name = "exif_an_${System.currentTimeMillis()}"
         open(photoWithExif("$name.jpg"))
-        click("Erweitert")
-        click("Kameradaten behalten")
-        click("Umwandeln")
-        assertNotNull(device.wait(Until.findObject(By.text("Teilen")), 30_000))
+        click(context.getString(R.string.setup_advanced))
+        click(context.getString(R.string.adv_keep_metadata))
+        click(context.getString(R.string.setup_convert))
+        assertNotNull(device.wait(Until.findObject(By.text(context.getString(R.string.share))), 30_000))
 
         val exif = readResult("$name.jpg")
         assertEquals("TestKamera", exif.getAttribute(ExifInterface.TAG_MAKE))

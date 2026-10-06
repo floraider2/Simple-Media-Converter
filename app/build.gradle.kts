@@ -75,6 +75,10 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    androidResources {
+        // Sprachwahl pro App (Android 13+): Liste der Sprachen aus den values-*-Ordnern.
+        generateLocaleConfig = true
+    }
     buildFeatures {
         compose = true
         resValues = true

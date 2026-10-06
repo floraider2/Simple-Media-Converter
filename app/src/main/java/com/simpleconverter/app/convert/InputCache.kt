@@ -3,12 +3,13 @@ package com.simpleconverter.app.convert
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
+import com.simpleconverter.app.R
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 /**
  * Geteilte Dateien (z. B. aus WhatsApp) dürfen wir nur lesen, solange unsere Activity lebt.
@@ -36,7 +37,7 @@ object InputCache {
             }.getOrNull() ?: -1L
             try {
                 val input = context.contentResolver.openInputStream(uri)
-                    ?: throw ConversionException("Die Datei ist nicht mehr erreichbar. Bitte erneut auswählen.")
+                    ?: throw ConversionException(R.string.err_file_unreachable)
                 input.use {
                     target.outputStream().use { output ->
                         val buffer = ByteArray(256 * 1024)
