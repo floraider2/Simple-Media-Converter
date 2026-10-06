@@ -1,17 +1,20 @@
 package com.simpleconverter.app
 
 import android.content.ContentUris
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
@@ -20,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -31,6 +35,13 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 29) // Ergebnis wird über MediaStore gelesen
 class ImageMetadataTest {
+
+    /** Sonst verdeckt beim ersten Start der Erlaubnis-Dialog die App. */
+    @get:Rule
+    val notifications: GrantPermissionRule =
+        if (Build.VERSION.SDK_INT >= 33) GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+        else GrantPermissionRule.grant()
+
 
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())

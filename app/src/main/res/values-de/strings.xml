@@ -174,4 +174,24 @@
     <string name="preset_downscaled">Verkleinert</string>
     <string name="preset_png_downscaled_desc">Max. 1600 px, verlustfrei</string>
     <string name="kbits">%d kbit/s</string>
+
+    <!-- Einstellungen -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_defaults">Standardformate</string>
+    <string name="settings_defaults_hint">Ist vorausgewählt, wenn du eine Datei öffnest. Du kannst es jedes Mal ändern.</string>
+    <string name="settings_video">Videos</string>
+    <string name="settings_audio">Musik &amp; Audio</string>
+    <string name="settings_image">Bilder</string>
+    <string name="settings_privacy">Datenschutz</string>
+    <string name="settings_keep_metadata_default">Kameradaten standardmäßig behalten</string>
+    <string name="settings_appearance">Darstellung</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Hell</string>
+    <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_about">Über die App</string>
+    <string name="settings_version">Version %s</string>
+    <string name="settings_offline">Funktioniert komplett offline – die App hat keine Internet-Berechtigung.</string>
+    <string name="settings_source">Quellcode auf GitHub</string>
+    <string name="settings_license">Freie Software unter der GNU GPL v3.0</string>
+    <string name="settings_third_party">MP3-Kodierung: LAME 3.100 (LGPL). Gebaut mit AndroidX Media3, Jetpack Compose und WorkManager (Apache 2.0).</string>
 </resources>

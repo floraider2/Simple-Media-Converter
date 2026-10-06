@@ -3,14 +3,21 @@ package com.simpleconverter.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.simpleconverter.app.data.ThemeMode
 import com.simpleconverter.app.ui.ConverterApp
 import com.simpleconverter.app.ui.ConverterViewModel
 import com.simpleconverter.app.ui.theme.SimpleConverterTheme
@@ -28,7 +35,20 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) vm.handleIntent(intent)
         askForNotifications()
         setContent {
-            SimpleConverterTheme {
+            val settings by vm.appSettings.collectAsStateWithLifecycle()
+            val dark = when (settings.theme) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            // Statusleisten-Symbole passend zum App-Design (nicht zum System) einfärben.
+            DisposableEffect(dark) {
+                val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
+                else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
+            SimpleConverterTheme(settings.theme) {
                 ConverterApp(vm)
             }
         }

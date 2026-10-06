@@ -13,8 +13,10 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.OutputStore
+import com.simpleconverter.app.data.AppSettings
 import com.simpleconverter.app.data.FileInspector
 import com.simpleconverter.app.data.RecentStore
+import com.simpleconverter.app.data.SettingsStore
 import com.simpleconverter.app.model.ConversionSettings
 import com.simpleconverter.app.model.FileResult
 import com.simpleconverter.app.model.InputFile
@@ -36,6 +38,7 @@ import kotlinx.coroutines.withContext
 
 sealed interface Screen {
     data object Home : Screen
+    data object Settings : Screen
     data class Setup(
         val files: List<InputFile>,
         val format: OutputFormat,
@@ -61,6 +64,8 @@ sealed interface Screen {
 class ConverterViewModel(app: Application) : AndroidViewModel(app) {
 
     private val workManager = WorkManager.getInstance(app)
+    private val settingsStore = SettingsStore.get(app)
+    val appSettings: StateFlow<AppSettings> = settingsStore.settings
 
     private val _screen = MutableStateFlow<Screen>(Screen.Home)
     val screen: StateFlow<Screen> = _screen.asStateFlow()
@@ -128,7 +133,7 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
                     _message.value = str(R.string.msg_mixed_kinds)
                 else -> {
                     if (skipped > 0) _message.value = plural(R.plurals.msg_skipped, skipped)
-                    _screen.value = setupFor(files, targets.first())
+                    _screen.value = setupFor(files, preferredFormat(files))
                 }
             }
         }
@@ -142,14 +147,16 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
     fun selectPreset(id: String) {
         val current = _screen.value as? Screen.Setup ?: return
         val preset = Presets.forFormat(current.format).firstOrNull { it.id == id } ?: return
-        _screen.value = current.copy(presetId = id, settings = preset.settings)
+        _screen.value = current.copy(presetId = id, settings = preset.settings.copy(keepMetadata = current.settings.keepMetadata))
     }
 
     /** Änderung unter „Erweitert“ – macht aus der Vorgabe eigene Einstellungen. */
     fun updateSettings(transform: (ConversionSettings) -> ConversionSettings) {
         val current = _screen.value as? Screen.Setup ?: return
         val updated = transform(current.settings)
-        val matching = Presets.forFormat(current.format).firstOrNull { it.settings == updated }
+        // „Kameradaten behalten“ ist unabhängig von der Vorgabe.
+        val matching = Presets.forFormat(current.format)
+            .firstOrNull { it.settings.copy(keepMetadata = updated.keepMetadata) == updated }
         _screen.value = current.copy(settings = updated, presetId = matching?.id)
     }
 
@@ -197,8 +204,14 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
             is Screen.Done -> s.files
             else -> return
         }
-        _screen.value = setupFor(files, commonTargets(files).first())
+        _screen.value = setupFor(files, preferredFormat(files))
     }
+
+    fun openSettings() {
+        if (_screen.value is Screen.Home) _screen.value = Screen.Settings
+    }
+
+    fun updateAppSettings(transform: (AppSettings) -> AppSettings) = settingsStore.update(transform)
 
     /** „Speichern unter …“ für ein Ergebnis. */
     fun saveCopy(result: FileResult, target: Uri) {
@@ -292,7 +305,15 @@ class ConverterViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun setupFor(files: List<InputFile>, format: OutputFormat): Screen.Setup {
         val first = Presets.forFormat(format).first()
-        return Screen.Setup(files, format, first.id, first.settings)
+        val settings = first.settings.copy(keepMetadata = appSettings.value.keepMetadata)
+        return Screen.Setup(files, format, first.id, settings)
+    }
+
+    /** Standardformat aus den Einstellungen, falls es für alle Dateien passt. */
+    private fun preferredFormat(files: List<InputFile>): OutputFormat {
+        val targets = commonTargets(files)
+        val preferred = appSettings.value.defaultFor(files.first().kind)
+        return if (preferred in targets) preferred else targets.first()
     }
 
     private fun refreshRecents() {

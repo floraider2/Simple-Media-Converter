@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests + 4 Geräte-Tests grün, Lint sauber, getestet auf Galaxy S24 Ultra / Android 16)
 
-**Aktueller Schwerpunkt:** v0.3 – Sprachen ✅, als Nächstes Einstellungen-Seite, Kürzen, Lautstärke, Verlauf.
+**Aktueller Schwerpunkt:** v0.3 – Sprachen ✅, Einstellungen ✅, als Nächstes Kürzen, Lautstärke, Verlauf.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -216,7 +216,7 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 - [ ] **Kürzen mit Vorschau**: ExoPlayer-Vorschau + Bereichs-Schieberegler, Umsetzung über `MediaItem.ClippingConfiguration`
 - [ ] **Lautstärke angleichen**: FFmpeg `loudnorm` (zweistufig, EBU R128, Ziel −14 LUFS / −16 LUFS)
 - [ ] **Verlauf** auf Room umstellen, Suche/Filter im Verlauf, einzelne Einträge löschen
-- [ ] **Einstellungen-Seite**: Standardformat je Medientyp, Speicherort, „EXIF behalten“, Theme (System/Hell/Dunkel)
+- [x] **Einstellungen-Seite**: Standardformat je Medientyp, „Kameradaten behalten“ als Standard, Design (System/Hell/Dunkel), Über-Bereich (Version, Lizenz, Quellcode, Fremdsoftware). Speicherort bleibt MediaStore + „Speichern unter …“
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
 - [ ] **Quick Settings Tile** (optional)
 - [x] Alle Texte nach `strings.xml`: **Englisch** als Grundsprache, **Deutsch** in `values-de` (L7); Sprachwahl pro App ab Android 13; Geräte-Tests sprachunabhängig
