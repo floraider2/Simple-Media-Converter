@@ -22,7 +22,7 @@
     <!-- Start -->
     <string name="home_question">Was möchtest du umwandeln?</string>
     <string name="home_subtitle">Video, Audio oder Bild – alles bleibt auf deinem Gerät.</string>
-    <string name="home_pick_gallery">🖼️  Aus der Galerie wählen</string>
+    <string name="home_pick_gallery">Aus der Galerie wählen</string>
     <string name="home_pick_file">Datei suchen (auch Musik)</string>
     <string name="home_multiple_hint">Mehrere Dateien auf einmal? Einfach mehrere auswählen.</string>
     <string name="home_share_tip">Tipp: Du kannst Dateien auch aus WhatsApp, der Galerie oder dem Dateimanager direkt an „Simple Converter“ teilen.</string>
@@ -228,4 +228,10 @@
     <string name="settings_thumbnails">Vorschaubilder anzeigen</string>
     <string name="settings_thumbnails_hint">Vorschau im Verlauf und beim Umwandeln. Aus: nur Symbole.</string>
     <string name="history_just_now">gerade eben</string>
+
+    <!-- Barrierefreiheit (TalkBack) -->
+    <string name="a11y_expanded">aufgeklappt</string>
+    <string name="a11y_collapsed">zugeklappt</string>
+    <string name="a11y_expand">aufklappen</string>
+    <string name="a11y_collapse">zuklappen</string>
 </resources>

@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.simpleconverter.app.BuildConfig
@@ -158,7 +160,8 @@ private fun <T> Chips(options: List<Pair<T, String>>, selected: T, onSelect: (T)
 }
 
 @Composable
-private fun Heading(text: String) = Text(text, style = MaterialTheme.typography.titleMedium)
+private fun Heading(text: String) =
+    Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
 
 @Composable
 private fun Hint(text: String) =

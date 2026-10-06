@@ -34,7 +34,10 @@ That's all. If you have ideas, feel free to [open an issue](https://github.com/f
 - **Many files at once:** up to 100, e.g. 50 HEIC photos → JPG. If one file fails, the others keep going.
 - **Runs in the background** with progress in the notification.
 - **Where files go:** `Movies/`, `Music/` or `Pictures/SimpleConverter` by default. In the settings you can pick a default folder per file type, and change the folder for a single conversion. Results can be shared, opened or saved anywhere with “Save as …”.
-- **Settings:** default format per file type, save location, keep camera details, theme (system / light / dark).
+- **Trim** videos and audio with a preview, and **normalize loudness** to −14 LUFS (like streaming services).
+- **History** with search, filter and thumbnails.
+- **Settings:** default format per file type, save location, keep camera details, theme (system / light / dark), thumbnails on/off.
+- **Accessible:** works with TalkBack and large font sizes.
 - **Languages:** English and German. On Android 13+ you can choose the language for this app only (*Settings → Apps → Simple Converter → Language*).
 
 Requires Android 8 or newer.
@@ -79,7 +82,7 @@ Translations are welcome: copy `app/src/main/res/values/strings.xml` to `values-
 - **v0.1** ✅ Video, audio and image conversion, sharing, presets
 - **v0.2** ✅ Batch conversion, MP3/Opus/FLAC, WebM, H.265, HDR → SDR, “Save as”, keep camera details
 - **v0.3** ✅ English + German, settings, save location
-- **v0.4** Trim with preview, loudness normalization, history with search, widget
+- **v0.4** ✅ Trim with preview, loudness normalization (−14 LUFS), history with search, thumbnails, accessibility
 - **Maybe:** F-Droid and Play Store – not decided yet
 
 Details: [PLAN.md](PLAN.md) (German).
@@ -114,7 +117,10 @@ Das war's. Wenn ihr noch Ideen habt, [schreibt gern ein Issue](https://github.co
 - **Vorgaben statt Fachbegriffe:** Für WhatsApp · Für E-Mail · Kleinste Datei · Max. Qualität
 - **Viele Dateien auf einmal**, z. B. 50 HEIC-Fotos → JPG
 - Läuft **im Hintergrund** mit Fortschritt in der Benachrichtigung
+- **Kürzen** mit Vorschau und **Lautstärke angleichen** (−14 LUFS)
+- **Verlauf** mit Suche und Vorschaubildern
 - **Einstellungen:** Standardformat und Speicherort je Dateityp, Design (System/Hell/Dunkel)
+- **Barrierefrei:** mit TalkBack und großer Schrift nutzbar
 - **Sprachen:** Deutsch und Englisch
 
 Ab Android 8.

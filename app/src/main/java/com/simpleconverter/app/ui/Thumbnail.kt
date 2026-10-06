@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.simpleconverter.app.model.MediaKind
@@ -87,8 +88,10 @@ fun Thumbnail(uri: Uri, kind: MediaKind, size: Dp = 48.dp) {
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
+            // Nur Dekoration – TalkBack liest daneben ohnehin den Dateinamen vor.
             Text(
-                when (kind) {
+                modifier = Modifier.clearAndSetSemantics {},
+                text = when (kind) {
                     MediaKind.VIDEO -> "🎬"
                     MediaKind.AUDIO -> "🎵"
                     MediaKind.IMAGE -> "🖼️"

@@ -2,7 +2,7 @@
 
 Stand: 06.10.2026 · Neueste Version: **v0.3.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.4 – Kürzen ✅, Lautstärke ✅, Verlauf + Vorschaubilder ✅, als Nächstes Widget, Schnell-Kachel, Barrierefreiheit.
+**Aktueller Schwerpunkt:** v0.4.0 veröffentlicht (Kürzen, Lautstärke, Verlauf, Vorschaubilder, Barrierefreiheit). Widget und Schnell-Kachel: später / vielleicht.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -217,15 +217,18 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 - [x] **Einstellungen-Seite**: Standardformat je Medientyp, „Kameradaten behalten“ als Standard, Design (System/Hell/Dunkel), Über-Bereich (Version, Lizenz, Quellcode, Fremdsoftware)
 - [x] **Speicherort**: Standardordner je Dateityp (Video/Audio/Bild) in den Einstellungen; bei jeder Umwandlung sichtbar und für diese eine Umwandlung änderbar. Ordner per Systemauswahl mit dauerhaften Rechten; ist er nicht mehr erreichbar, landet die Datei im Standardordner
 
-### v0.4 – Komfort (aus v0.3 verschoben)
+### v0.4 – Komfort ✅ (Release v0.4.0)
 
 - [x] **Kürzen mit Vorschau** (einzelne Video-/Audiodatei): ExoPlayer-Vorschau, Bereichs-Schieberegler (vom System-Zurückwischen ausgenommen), „Anfang hier“/„Ende hier“ an der Abspielstelle. Video über `MediaItem.ClippingConfiguration`, Audio schneidet der `PcmDecoder` sample-genau zu; Zielgröße rechnet mit der gekürzten Länge
 - [x] **Lautstärke angleichen** auf −14 LUFS (EBU R128 / BS.1770, eigener Messer ohne FFmpeg), Spitzen max. −1 dBFS; zwei Durchgänge (messen 0–40 %, umwandeln 40–100 %); für alle Audioformate und die Tonspur von Videos
 - [x] **Verlauf**: eigene Seite mit Suche (Ziel- und Quellname, mehrere Wörter), Filter nach Dateityp, Menü je Eintrag (Teilen, aus Verlauf entfernen – die Datei bleibt); Start zeigt die letzten 5 + „Alle anzeigen“; bis 200 Einträge. **Kein Room**: bei so wenigen Einträgen reicht die bisherige JSON-Speicherung
 - [x] Vorschaubilder in Setup und Verlauf (System-Thumbnails ab Android 10, Zwischenspeicher im RAM); in den Einstellungen abschaltbar (Standard: an)
+- [x] **Barrierefreiheit**: Überschriften für TalkBack, Emojis/Vorschaubilder als Deko ausgeblendet, Vorgaben als Auswahlgruppe, Regler beschriftet, Auf-/Zuklappen mit Zustand, Dateiwechsel wird angesagt; Schriftgröße 200 % geprüft (Titel einzeilig mit „…“); automatische Prüfung auf unbeschriftete Bedienelemente; Debug-Testschalter `--ef debugFontScale 2.0`
+
+### Später / vielleicht
+
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
-- [ ] **Quick Settings Tile** (optional)
-- [ ] Barrierefreiheit: TalkBack-Beschreibungen, Schriftgröße 200 %, Kontrast prüfen
+- [ ] **Quick Settings Tile**
 
 ### Vielleicht: Veröffentlichung auf F-Droid / Play Store (noch nicht entschieden)
 
@@ -353,6 +356,14 @@ Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Enco
 |---|---|
 | Leise Datei (−30 LUFS) → WAV angeglichen | ✅ −14,00 LUFS |
 | Testton (−9,33 LUFS) → M4A angeglichen → zurück nach WAV | ✅ −14,02 LUFS (Media3-Weg, gilt auch für Video-Tonspur) |
+
+**v0.4 Barrierefreiheit (06.10.2026)** – Unit-Tests 40, Geräte-Tests 6/6
+
+| Prüfung | Ergebnis |
+|---|---|
+| Automatisch: unbeschriftete Bedienelemente, vorgelesene Emojis, zu kleine Ziele (alle Bildschirme) | Galerie-Emoji und Qualitätsregler behoben; Rest waren Elemente am Bildrand ✅ |
+| Schriftgröße 200 % (Debug-Schalter, Systemeinstellung unverändert) | Titelzeile abgeschnitten → einzeilig mit „…“ ✅, sonst alles lesbar |
+| TalkBack live | nicht eingeschaltet (Systemeinstellung des Testgeräts) – Struktur über Semantik geprüft |
 
 **Gefunden und behoben**
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.
