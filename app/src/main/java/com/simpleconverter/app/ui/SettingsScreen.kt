@@ -61,6 +61,22 @@ fun SettingsScreen(vm: ConverterViewModel, modifier: Modifier) {
         }
 
         HorizontalDivider()
+        Heading(stringResource(R.string.folder_title))
+        Hint(stringResource(R.string.folder_settings_hint))
+        listOf(
+            MediaKind.VIDEO to R.string.settings_video,
+            MediaKind.AUDIO to R.string.settings_audio,
+            MediaKind.IMAGE to R.string.settings_image,
+        ).forEach { (kind, title) ->
+            FolderRow(
+                title = stringResource(title),
+                folder = settings.folderFor(kind),
+                kind = kind,
+                onPick = { vm.chooseDefaultFolder(kind, it) },
+            )
+        }
+
+        HorizontalDivider()
         Heading(stringResource(R.string.settings_privacy))
         Row(
             Modifier

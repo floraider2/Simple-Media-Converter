@@ -2,7 +2,7 @@
 
 Stand: 05.10.2026 · Version im Repo: **v0.1.1 in Arbeit** (baut, 15 Unit-Tests + 4 Geräte-Tests grün, Lint sauber, getestet auf Galaxy S24 Ultra / Android 16)
 
-**Aktueller Schwerpunkt:** v0.3 – Sprachen ✅, Einstellungen ✅, als Nächstes Kürzen, Lautstärke, Verlauf.
+**Aktueller Schwerpunkt:** v0.3.0 veröffentlicht (Sprachen, Einstellungen, Speicherort). Als Nächstes v0.4 – noch nicht begonnen.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -211,16 +211,20 @@ Nur MP3 fehlt – dafür reicht LAME (≈ 270 KB je ABI) statt eines kompletten 
 - [x] Option „Kameradaten behalten“ (Kopieren über `ExifInterface`, GPS wird nie kopiert)
 - [x] Debug-Build mit eigenem Paketnamen (`.debug`), läuft neben der installierten Release-Version
 
-### v0.3 – Komfort (3 Wochen)
+### v0.3 – Sprachen & Einstellungen ✅ (Release v0.3.0)
 
-- [ ] **Kürzen mit Vorschau**: ExoPlayer-Vorschau + Bereichs-Schieberegler, Umsetzung über `MediaItem.ClippingConfiguration`
-- [ ] **Lautstärke angleichen**: FFmpeg `loudnorm` (zweistufig, EBU R128, Ziel −14 LUFS / −16 LUFS)
+- [x] Alle Texte nach `strings.xml`: **Englisch** als Grundsprache, **Deutsch** in `values-de` (L7); Sprachwahl pro App ab Android 13; Geräte-Tests sprachunabhängig
+- [x] **Einstellungen-Seite**: Standardformat je Medientyp, „Kameradaten behalten“ als Standard, Design (System/Hell/Dunkel), Über-Bereich (Version, Lizenz, Quellcode, Fremdsoftware)
+- [x] **Speicherort**: Standardordner je Dateityp (Video/Audio/Bild) in den Einstellungen; bei jeder Umwandlung sichtbar und für diese eine Umwandlung änderbar. Ordner per Systemauswahl mit dauerhaften Rechten; ist er nicht mehr erreichbar, landet die Datei im Standardordner
+
+### v0.4 – Komfort (aus v0.3 verschoben)
+
+- [ ] **Kürzen mit Vorschau**: ExoPlayer-Vorschau + Bereichs-Schieberegler, Umsetzung über `MediaItem.ClippingConfiguration` (Video) bzw. Bereich im `PcmDecoder` (Audio)
+- [ ] **Lautstärke angleichen** (EBU R128, Ziel −14 / −16 LUFS) – ohne FFmpeg: eigene Messung im PCM-Weg
 - [ ] **Verlauf** auf Room umstellen, Suche/Filter im Verlauf, einzelne Einträge löschen
-- [x] **Einstellungen-Seite**: Standardformat je Medientyp, „Kameradaten behalten“ als Standard, Design (System/Hell/Dunkel), Über-Bereich (Version, Lizenz, Quellcode, Fremdsoftware). Speicherort bleibt MediaStore + „Speichern unter …“
+- [ ] Vorschaubilder (Thumbnails) in Setup und Verlauf
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
 - [ ] **Quick Settings Tile** (optional)
-- [x] Alle Texte nach `strings.xml`: **Englisch** als Grundsprache, **Deutsch** in `values-de` (L7); Sprachwahl pro App ab Android 13; Geräte-Tests sprachunabhängig
-- [ ] Vorschaubilder (Thumbnails) in Setup und Verlauf
 - [ ] Barrierefreiheit: TalkBack-Beschreibungen, Schriftgröße 200 %, Kontrast prüfen
 
 ### v1.0 – Veröffentlichung (2–3 Wochen)
@@ -318,6 +322,18 @@ Gefunden: Opus/FLAC anfangs extrem langsam (10 min Audio > 5 min), weil die Enco
 | `ImageMetadataTest`: Standard entfernt Kamera + GPS; „Kameradaten behalten“ übernimmt Kamera/Zeit, nie GPS | ✅ 2/2 |
 | „Speichern unter …“ | Knopf vorhanden; Dateiauswahl nicht automatisiert (zeigt private Ordner) |
 | WebM **mit Ton** (Opus-Spur), HDR-Quelle | ⏳ kein passendes Testvideo |
+
+**v0.3 (06.10.2026)** – Geräte-Tests 6/6, Unit-Tests, Lint ohne Befund
+
+| Test | Ergebnis |
+|---|---|
+| App auf Englisch: Start, Einstellungen, Umwandeln, Ergebnis | ✅ keine deutschen Reste |
+| Standardformat (Audio → WAV), „Kameradaten behalten“ als Standard | ✅ werden beim Öffnen übernommen |
+| Design Hell / Dunkel | ✅ (Statusleiste im hellen Design zuerst unlesbar → behoben) |
+| Speicherort für eine Umwandlung ändern (Download/SCTest) | ✅ Datei landet dort, nächste Umwandlung wieder Standard |
+| Standardordner Audio in den Einstellungen | ✅ wird beim Öffnen angezeigt und genutzt; „Standard“ setzt zurück |
+| „Öffnen“ einer Datei im eigenen Ordner | ✅ App-Auswahl erscheint |
+| „Über die App“, Link zum Quellcode | ✅ |
 
 **Gefunden und behoben**
 - Vorgaben mit fester Bitrate machten sparsam kodierte Videos *größer* → Bitrate wird jetzt auf die des Originals begrenzt; zusätzlich Hinweis, wenn das Ergebnis trotzdem größer ist.

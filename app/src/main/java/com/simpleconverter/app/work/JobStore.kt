@@ -56,6 +56,7 @@ object JobStore {
             .put("imageQuality", st.imageQuality)
             .put("hevc", st.hevc)
             .put("keepMetadata", st.keepMetadata)
+            .put("outputFolder", st.outputFolder ?: "")
         write(file(context, job.id, ""), JSONObject().put("files", files).put("settings", settings))
     }
 
@@ -86,6 +87,7 @@ object JobStore {
             imageQuality = s.getInt("imageQuality"),
             hevc = s.optBoolean("hevc", false),
             keepMetadata = s.optBoolean("keepMetadata", false),
+            outputFolder = s.optString("outputFolder").takeIf { it.isNotEmpty() },
         )
         Job(id, files, settings)
     }.getOrNull()

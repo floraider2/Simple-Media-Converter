@@ -18,12 +18,49 @@ import java.io.File
 object OutputStore {
     private const val FOLDER = "SimpleConverter"
 
-    fun save(context: Context, file: File, displayName: String, format: OutputFormat): Uri =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    /**
+     * Speichert in [folder] (vom Nutzer gewählter Ordner), sonst im Standardordner.
+     * Ist der gewählte Ordner nicht mehr erreichbar (gelöscht, Rechte entzogen), landet die
+     * Datei im Standardordner, statt verloren zu gehen.
+     */
+    fun save(context: Context, file: File, displayName: String, format: OutputFormat, folder: String? = null): Uri {
+        if (folder != null) {
+            runCatching { return saveToTree(context, file, displayName, format, Uri.parse(folder)) }
+        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             saveToMediaStore(context, file, displayName, format)
         } else {
             saveToAppFolder(context, file, displayName, format)
         }
+    }
+
+    private fun saveToTree(context: Context, file: File, displayName: String, format: OutputFormat, tree: Uri): Uri {
+        val resolver = context.contentResolver
+        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        val target = DocumentsContract.createDocument(resolver, parent, format.mimeType, displayName)
+            ?: throw ConversionException(R.string.err_save_failed)
+        try {
+            copy(context, Uri.fromFile(file), target)
+        } catch (e: Exception) {
+            runCatching { DocumentsContract.deleteDocument(resolver, target) }
+            throw e
+        }
+        return target
+    }
+
+    /** Anzeigename eines Ordners, z. B. „Download/Konvertiert“; null = Standardordner. */
+    fun folderLabel(folder: String?): String? {
+        if (folder == null) return null
+        val id = runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(folder)) }.getOrNull() ?: return folder
+        return id.substringAfter(':').ifEmpty { id.substringBefore(':') }
+    }
+
+    /** Wo Dateien ohne eigenen Ordner landen. */
+    fun defaultFolderLabel(kind: MediaKind): String = when (kind) {
+        MediaKind.VIDEO -> Environment.DIRECTORY_MOVIES
+        MediaKind.AUDIO -> Environment.DIRECTORY_MUSIC
+        MediaKind.IMAGE -> Environment.DIRECTORY_PICTURES
+    } + "/" + FOLDER
 
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun saveToMediaStore(context: Context, file: File, displayName: String, format: OutputFormat): Uri {

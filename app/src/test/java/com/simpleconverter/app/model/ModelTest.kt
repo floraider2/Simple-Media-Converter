@@ -81,6 +81,7 @@ class SettingsAndPresetsTest {
             imageQuality = 75,
             hevc = true,
             keepMetadata = true,
+            outputFolder = "content://com.android.externalstorage.documents/tree/primary%3AMusic",
         )
         assertEquals(settings, ConversionSettings.fromData(settings.toData()))
     }

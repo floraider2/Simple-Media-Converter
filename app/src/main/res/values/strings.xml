@@ -195,4 +195,11 @@
     <string name="settings_source">Source code on GitHub</string>
     <string name="settings_license">Free software under the GNU GPL v3.0</string>
     <string name="settings_third_party">MP3 encoding: LAME 3.100 (LGPL). Built with AndroidX Media3, Jetpack Compose and WorkManager (Apache 2.0).</string>
+
+    <!-- Speicherort -->
+    <string name="folder_title">Save to</string>
+    <string name="folder_settings_hint">Default folder for each file type. You can pick another folder for a single conversion.</string>
+    <string name="folder_default_suffix">%s (default)</string>
+    <string name="folder_change">Change</string>
+    <string name="folder_reset">Default</string>
 </resources>
