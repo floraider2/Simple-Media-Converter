@@ -100,17 +100,26 @@ fun TrimSection(file: InputFile, settings: ConversionSettings, onTrim: (Long?, L
 
         AnimatedVisibility(expanded) {
             val context = LocalContext.current
+            // WMV/WMA kann der Player nicht abspielen: dann nur der Regler, ohne Vorschau.
+            val canPreview = file.videoMime != "video/x-ms-wmv" && file.audioMime != "audio/x-ms-wma"
             val player = remember(file.uri) {
+                if (!canPreview) return@remember null
                 ExoPlayer.Builder(context).build().apply {
                     setMediaItem(MediaItem.fromUri(file.uri))
                     prepare()
                     seekTo(start)
                 }
             }
-            DisposableEffect(player) { onDispose { player.release() } }
+            DisposableEffect(player) { onDispose { player?.release() } }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AndroidView(
+                if (player == null) {
+                    Text(
+                        stringResource(R.string.trim_no_preview),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else AndroidView(
                     factory = { ctx ->
                         PlayerView(ctx).apply {
                             this.player = player
@@ -133,7 +142,7 @@ fun TrimSection(file: InputFile, settings: ConversionSettings, onTrim: (Long?, L
                         val newStart = range.start.toLong()
                         val newEnd = range.endInclusive.toLong()
                         // Vorschau dorthin springen, wo gerade gezogen wird.
-                        player.seekTo(if (newStart != start) newStart else newEnd)
+                        player?.seekTo(if (newStart != start) newStart else newEnd)
                         onTrim(newStart, newEnd)
                     },
                     valueRange = 0f..full.toFloat(),
@@ -143,11 +152,13 @@ fun TrimSection(file: InputFile, settings: ConversionSettings, onTrim: (Long?, L
                         .semantics { contentDescription = rangeLabel },
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { onTrim(player.currentPosition.coerceAtMost(end - 1), settings.trimEndMs) }) {
-                        Text(stringResource(R.string.trim_set_start))
-                    }
-                    OutlinedButton(onClick = { onTrim(settings.trimStartMs, player.currentPosition.coerceAtLeast(start + 1)) }) {
-                        Text(stringResource(R.string.trim_set_end))
+                    if (player != null) {
+                        OutlinedButton(onClick = { onTrim(player.currentPosition.coerceAtMost(end - 1), settings.trimEndMs) }) {
+                            Text(stringResource(R.string.trim_set_start))
+                        }
+                        OutlinedButton(onClick = { onTrim(settings.trimStartMs, player.currentPosition.coerceAtLeast(start + 1)) }) {
+                            Text(stringResource(R.string.trim_set_end))
+                        }
                     }
                     if (settings.isTrimmed) {
                         TextButton(onClick = { onTrim(null, null) }) { Text(stringResource(R.string.trim_reset)) }

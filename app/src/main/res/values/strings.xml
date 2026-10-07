@@ -211,6 +211,7 @@
     <string name="trim_set_start">Start here</string>
     <string name="trim_set_end">End here</string>
     <string name="trim_reset">Reset</string>
+    <string name="trim_no_preview">No preview for this format. Choose start and end with the slider.</string>
 
     <!-- Lautstärke -->
     <string name="adv_normalize">Normalize loudness</string>

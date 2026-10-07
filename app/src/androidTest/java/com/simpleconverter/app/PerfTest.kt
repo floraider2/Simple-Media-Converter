@@ -143,6 +143,35 @@ class PerfTest {
         }
     }
 
+    /**
+     * WMV über FFmpeg. Braucht eine lange Testdatei auf dem Gerät (siehe tools/testmedia/README.md):
+     * /data/local/tmp/sctest_long.wmv – fehlt sie, wird der Test übersprungen.
+     */
+    @Test
+    fun wmv(): Unit = runBlocking {
+        val source = "/data/local/tmp/sctest_long.wmv"
+        val local = File(dir, "long.wmv")
+        // Die App darf /data/local/tmp nicht lesen, die Shell schon: über sie kopieren.
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("cat $source")).use { input ->
+            local.outputStream().use { input.copyTo(it) }
+        }
+        org.junit.Assume.assumeTrue("$source fehlt", local.length() > 0)
+        val uri = uri(local)
+        val file = FileInspector.inspect(context, uri)!!
+        val seconds = (file.durationMs ?: 0) / 1000.0
+        val mp4 = out(OutputFormat.MP4)
+        measure("WMV %.0f min 720p → MP4 (WhatsApp)".format(seconds / 60)) {
+            VideoConverter.convert(context, uri, mp4, Presets.forFormat(OutputFormat.MP4).first().settings, file.durationMs, {})
+        }
+        val mp3 = out(OutputFormat.MP3)
+        measure("WMV %.0f min → MP3".format(seconds / 60)) {
+            AudioConverter.convert(context, uri, mp3, Presets.forFormat(OutputFormat.MP3).first().settings, {})
+        }
+        verifyLength(mp3, seconds)
+        local.delete()
+    }
+
     @Test
     fun imageBatch() {
         val settings = Presets.forFormat(OutputFormat.JPG).first().settings

@@ -11,6 +11,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.source.UnrecognizedInputFormatException
 import androidx.media3.effect.Presentation
 import androidx.media3.transformer.AudioEncoderSettings
 import androidx.media3.transformer.Composition
@@ -26,6 +27,8 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.simpleconverter.app.convert.audio.GainAudioProcessor
 import com.simpleconverter.app.convert.audio.Loudness
+import com.simpleconverter.app.convert.wmv.AsfAssetLoader
+import com.simpleconverter.app.convert.wmv.AsfDecoder
 import com.simpleconverter.app.data.FileInspector
 import com.simpleconverter.app.model.Bitrate
 import com.simpleconverter.app.model.ConversionSettings
@@ -70,6 +73,10 @@ object VideoConverter {
         export(context, input, output, settings, durationMs, onProgress, gainDb)
     }
 
+    /**
+     * Kann Media3 die Datei nicht lesen (z. B. WMV), noch einmal mit dem Leser und den Decodern von Android –
+     * das klappt, wenn das Gerät passende Decoder hat (siehe [FrameworkAssetLoader]).
+     */
     private suspend fun export(
         context: Context,
         input: Uri,
@@ -79,11 +86,32 @@ object VideoConverter {
         onProgress: (Int) -> Unit,
         gainDb: Double,
     ) {
+        try {
+            exportOnce(context, input, output, settings, durationMs, onProgress, gainDb, frameworkReader = false)
+        } catch (e: ExportException) {
+            if (generateSequence<Throwable>(e) { it.cause }.none { it is UnrecognizedInputFormatException }) throw e
+            output.delete()
+            exportOnce(context, input, output, settings, durationMs, onProgress, gainDb, frameworkReader = true)
+        }
+    }
+
+    private suspend fun exportOnce(
+        context: Context,
+        input: Uri,
+        output: File,
+        settings: ConversionSettings,
+        durationMs: Long?,
+        onProgress: (Int) -> Unit,
+        gainDb: Double,
+        frameworkReader: Boolean,
+    ) {
         val copy = settings.passthrough
         val audioOnly = settings.format == OutputFormat.M4A
         val removeAudio = !audioOnly && settings.removeAudio
 
-        val probe = probe(context, input)
+        // WMV/WMA liest FFmpeg (Android kann es meist nicht) – auch die Eckdaten kommen von dort.
+        val asf = if (AsfDecoder.isAsf(context, input)) AsfDecoder.open(context, input).use { it.info } else null
+        val probe = if (asf != null) Probe(asf.width, asf.height, null).takeIf { asf.hasVideo } else probe(context, input)
         val videoOnly = if (audioOnly || copy) Effects.EMPTY else videoEffects(probe, settings.videoShortSide)
         val effects = if (gainDb == 0.0 || removeAudio) videoOnly
         else Effects(listOf(GainAudioProcessor(Loudness.linear(gainDb))), videoOnly.videoEffects)
@@ -106,10 +134,12 @@ object VideoConverter {
             .setEffects(effects)
             .build()
         // Welche Spuren die Ausgabe hat, muss Media3 vorab wissen.
-        val tracks = FileInspector.trackMimes(context, input)
+        val tracks = if (asf != null) null else FileInspector.trackMimes(context, input)
         val trackTypes = buildSet {
-            if (!audioOnly && (tracks == null || tracks.video != null)) add(C.TRACK_TYPE_VIDEO)
-            if (!removeAudio && (tracks == null || tracks.audio != null)) add(C.TRACK_TYPE_AUDIO)
+            val hasVideo = asf?.hasVideo ?: (tracks == null || tracks.video != null)
+            val hasAudio = asf?.hasAudio ?: (tracks == null || tracks.audio != null)
+            if (!audioOnly && hasVideo) add(C.TRACK_TYPE_VIDEO)
+            if (!removeAudio && hasAudio) add(C.TRACK_TYPE_AUDIO)
         }
         val composition = Composition.Builder(EditedMediaItemSequence.Builder(trackTypes).addItem(edited).build())
             .apply {
@@ -161,6 +191,12 @@ object VideoConverter {
                     }
                 }
                 transformer = Transformer.Builder(context.applicationContext)
+                    .apply {
+                        when {
+                            asf != null -> setAssetLoaderFactory(AsfAssetLoader.Factory(context))
+                            frameworkReader -> setAssetLoaderFactory(FrameworkAssetLoader.Factory(context))
+                        }
+                    }
                     .apply {
                         // Beim Kopieren die Formate der Quelle behalten.
                         if (!copy) {

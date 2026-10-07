@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ConversionException
+import com.simpleconverter.app.convert.wmv.AsfDecoder
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.ArrayDeque
@@ -73,6 +74,8 @@ object PcmDecoder {
         startUs: Long = 0L,
         endUs: Long? = null,
     ) {
+        // WMV/WMA kann Android meist nicht lesen – dafür FFmpeg.
+        if (AsfDecoder.isAsf(context, input)) return decodeAsf(context, input, sink, onProgress, startUs, endUs)
         val extractor = try {
             AudioSource.open(context, input)
         } catch (e: Exception) {
@@ -99,6 +102,44 @@ object PcmDecoder {
             }
         } finally {
             extractor.release()
+            sink.release()
+        }
+    }
+
+    // ───────────── 0. WMV/WMA über FFmpeg ─────────────
+
+    private suspend fun decodeAsf(context: Context, input: Uri, sink: PcmSink, onProgress: (Int) -> Unit, startUs: Long, endUs: Long?) {
+        val decoder = try {
+            AsfDecoder.open(context, input)
+        } catch (e: Exception) {
+            sink.release()
+            if (e is SecurityException || e is java.io.FileNotFoundException) throw e
+            throw ConversionException(R.string.err_cannot_open_file)
+        }
+        try {
+            val info = decoder.info
+            if (!info.hasAudio) throw ConversionException(R.string.err_no_audio_track)
+            decoder.start(video = false, audio = true)
+            val range = Range(startUs, endUs ?: Long.MAX_VALUE, (endUs ?: info.durationUs) - startUs, onProgress)
+            if (startUs > 0) decoder.seekTo(startUs)
+            sink.start(info.sampleRate, info.channels)
+            while (true) {
+                coroutineContext.ensureActive()
+                when (decoder.read()) {
+                    AsfDecoder.Result.AUDIO -> {
+                        val pts = decoder.ptsUs
+                        if (pts > range.stopUs) break
+                        val pcm = decoder.audio.order(ByteOrder.LITTLE_ENDIAN)
+                        clip(pcm, pts, range.startUs, range.stopUs, info.sampleRate, info.channels)?.let(sink::write)
+                        range.progress(pts)
+                    }
+                    AsfDecoder.Result.VIDEO -> decoder.dropFrame()
+                    AsfDecoder.Result.END -> break
+                }
+            }
+            sink.finish()
+        } finally {
+            decoder.close()
             sink.release()
         }
     }

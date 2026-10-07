@@ -210,6 +210,7 @@
     <string name="trim_set_start">Anfang hier</string>
     <string name="trim_set_end">Ende hier</string>
     <string name="trim_reset">Zurücksetzen</string>
+    <string name="trim_no_preview">Für dieses Format gibt es keine Vorschau. Anfang und Ende mit dem Regler wählen.</string>
 
     <!-- Lautstärke -->
     <string name="adv_normalize">Lautstärke angleichen</string>

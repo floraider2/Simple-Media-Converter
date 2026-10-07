@@ -1,8 +1,8 @@
 # Simple Converter – Projektplan
 
-Stand: 06.10.2026 · Neueste Version: **v0.6.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
+Stand: 07.10.2026 · Neueste Version: **v0.7.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.6.0 (alles aktualisiert, schnellerer Start) veröffentlicht. Widget und Schnell-Kachel: später / vielleicht.
+**Aktueller Schwerpunkt:** v0.7.0 (WMV/WMA auf jedem Handy) veröffentlicht. Widget und Schnell-Kachel: später / vielleicht.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -250,6 +250,17 @@ Gemessen auf Galaxy S24 Ultra (Android 16) mit `PerfTest` und nicht-debuggbarem 
 - [x] Geräte-Tests räumen ihre Ergebnisse in Music/Pictures/Movies selbst wieder weg
 - FLAC liest weiterhin der eigene Leser (`FlacSource`), unabhängig von Media3
 
+### v0.7 – WMV/WMA ✅ (Release v0.7.0)
+
+- [x] **WMV/WMA über FFmpeg** (9.0.2, LGPL, nur ASF-Leser + Decoder WMV1/2/3, VC-1, WMA v1/v2/Pro/Voice/Lossless), komplett in Software – auf jedem Gerät gleich. Auf ARM mit den NEON-Routinen von FFmpeg, x86_64 nur C
+  - Quellen-Teilmenge im Repo (`app/src/main/cpp/ffmpeg`, 8 MB statt 105 MB), Gradle baut sie wie LAME; Werkzeuge zum Neu-Erzeugen liegen dabei
+  - Video: `AsfAssetLoader` liefert Bilder per `ImageWriter` mit Zeitstempel an Media3 (YUV, sonst RGBA aus C), Ton als PCM; Audio-Ziele über `PcmDecoder`
+  - Erkennen über die ASF-Kennung am Dateianfang; Dauer, Spuren und Größe kommen von FFmpeg. „Kürzen“ ohne Vorschau (der Player kann WMV nicht abspielen)
+- [x] Allgemeiner Rückfall für Container, die Media3 nicht liest: Leser von Android + Decoder des Geräts (`FrameworkAssetLoader`)
+- [x] Klare Meldung für Dateien, die sich nicht öffnen lassen
+- [x] Selbst erzeugte Testdateien und Bild-Ton-Messung (`testmedia/`), automatischer Test `AsfConversionTest`
+- [x] Test-Emulator: Android 16 (AOSP, x86_64) – prüft „Handy ohne WMV-Decoder“; Leistung weiter auf dem S24 Ultra
+
 ### Später / vielleicht
 
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
@@ -440,6 +451,26 @@ Galaxy S24 Ultra, `PerfTest` mit `-Pperf` (nicht debuggbar), beide Versionen gle
 | WAV → MP3, M4A, FLAC; Video → MP4, WebM, „Original behalten“, „Original-Ton“, Nur Ton M4A; PNG → JPG | ✅ 9/9 |
 | „Original-Ton“ Dateigröße | 1,38 MB (Platzhalter) → 994 KB nach Korrektur ✅ |
 | Kaputte Datei im Stapel | ✅ neue Meldung, die anderen laufen weiter |
+
+**v0.7 WMV/WMA (07.10.2026)** – Unit-Tests 42, Geräte-Tests 13/13 (Emulator), Lint ohne Befund
+
+Bild-Ton-Messung mit `testmedia/sctest_sync.wmv` (Blitz + Piep jede Sekunde), Emulator ohne WMV-Decoder:
+
+| Ergebnis | Länge | Ton minus Bild | Stereo |
+|---|---|---|---|
+| Original | 30,0 s | +12 ms | ✅ |
+| → MP4 | 30,0 s | +22 ms, gleichbleibend | ✅ |
+| → WebM | 30,0 s | +37 ms, gleichbleibend | ✅ |
+| → MP3 / M4A, WMA → MP3 | 29,9–30,0 s | – | ✅ |
+
+| Test | Ergebnis |
+|---|---|
+| Echte WMV3/WMA2-Datei, 92 min, 720p (S24 Ultra) | ✅ ca. 285 Bilder/s ≈ 9,5× Echtzeit; Engpass Media3 + Hardware-Encoder, nicht FFmpeg |
+| `PerfTest.wmv`: 10 min WMV 720p → MP4 / → MP3 (S24 Ultra, `-Pperf`) | 57,7 s (≈ 10× Echtzeit) / 17,8 s, Länge 599,96 s ✅ |
+| Release-Build (`.releasetest`) auf dem S24: WMV → MP4, WebM, MP3, M4A; WMA → MP3 | ✅ 5/5; Ton minus Bild MP4 +22 ms, WebM +17 ms, Stereo überall richtig |
+| APK-Größe | 3,58 → 8,5 MB (alle drei ABIs); je Gerät ca. +1,6 MB (`libasf.so`) |
+| Erste Version ohne NEON | Dekodieren auf einem Kern; mit NEON nur noch die Hälfte der Zeit nötig |
+| Samsung-WMA-Decoder | in den Systemdateien vorhanden, aber für Apps nicht freigegeben → Grund für FFmpeg |
 
 ### Manuelle Testmatrix
 
