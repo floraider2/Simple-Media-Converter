@@ -1,8 +1,8 @@
 # Simple Converter – Projektplan
 
-Stand: 07.10.2026 · Neueste Version: **v0.7.0** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
+Stand: 07.10.2026 · Neueste Version: **v0.7.1** (Unit-Tests + 6 Geräte-Tests grün, Lint sauber)
 
-**Aktueller Schwerpunkt:** v0.7.0 (WMV/WMA auf jedem Handy) veröffentlicht. Widget und Schnell-Kachel: später / vielleicht.
+**Aktueller Schwerpunkt:** v0.7.1 (Software-Rückfall für Dekoder) veröffentlicht. Widget und Schnell-Kachel: später / vielleicht.
 
 Repo: https://github.com/floraider2/Simple-Media-Converter · Branch: `main` (Versionen als Tags, siehe Abschnitt 11)
 
@@ -261,6 +261,13 @@ Gemessen auf Galaxy S24 Ultra (Android 16) mit `PerfTest` und nicht-debuggbarem 
 - [x] Selbst erzeugte Testdateien und Bild-Ton-Messung (`testmedia/`), automatischer Test `AsfConversionTest`
 - [x] Test-Emulator: Android 16 (AOSP, x86_64) – prüft „Handy ohne WMV-Decoder“; Leistung weiter auf dem S24 Ultra
 
+### v0.7.1 – Rückfall für Dekoder ✅ (Release v0.7.1)
+
+- [x] **Video (Media3):** `setEnableDecoderFallback(true)` – scheitert der erste Dekoder (meist Hardware), probiert Media3 die übrigen bis zum Software-Dekoder von Android. Vorher brach die Umwandlung sofort ab
+- [x] **Ton (eigener Weg):** `PcmDecoder` probiert alle Dekoder des Geräts für das Format der Reihe nach, solange noch nichts beim Ziel angekommen ist (vorher nur gebündelt → normal)
+- [x] Test `DecoderFallbackTest`: ein nicht vorhandener Dekoder steht an erster Stelle; Video und Ton klappen trotzdem (im Log belegt)
+- Encoder: Media3 fällt schon seit v0.1 auf andere Encoder/Einstellungen zurück (`setEnableFallback`); Ton-Encoder sind Android-Software oder eigene
+
 ### Später / vielleicht
 
 - [ ] **Widget** (Jetpack Glance): „Datei wählen“ mit einem Tipp
@@ -471,6 +478,8 @@ Bild-Ton-Messung mit `testmedia/sctest_sync.wmv` (Blitz + Piep jede Sekunde), Em
 | APK-Größe | 3,58 → 8,5 MB (alle drei ABIs); je Gerät ca. +1,6 MB (`libasf.so`) |
 | Erste Version ohne NEON | Dekodieren auf einem Kern; mit NEON nur noch die Hälfte der Zeit nötig |
 | Samsung-WMA-Decoder | in den Systemdateien vorhanden, aber für Apps nicht freigegeben → Grund für FFmpeg |
+
+**v0.7.1 (07.10.2026)** – Unit-Tests 42, Geräte-Tests 15/15 (S24 Ultra), Lint ohne Befund; Audio-Messwerte unverändert (z. B. 10 min M4A → MP3 + Lautstärke 15,0 s)
 
 ### Manuelle Testmatrix
 

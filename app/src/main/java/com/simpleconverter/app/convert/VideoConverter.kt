@@ -6,15 +6,21 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
+import androidx.annotation.VisibleForTesting
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.Clock
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.UnrecognizedInputFormatException
 import androidx.media3.effect.Presentation
 import androidx.media3.transformer.AudioEncoderSettings
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.DefaultAssetLoaderFactory
+import androidx.media3.transformer.DefaultDecoderFactory
 import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -51,6 +57,22 @@ import kotlinx.coroutines.withContext
  */
 @OptIn(UnstableApi::class, ExperimentalApi::class)
 object VideoConverter {
+
+    /** Nur für Tests: setzt einen nicht vorhandenen Dekoder an die Spitze, damit der Rückfall greifen muss. */
+    @VisibleForTesting
+    internal var brokenDecoderForTest = false
+
+    private object BrokenFirstSelector : MediaCodecSelector {
+        override fun getDecoderInfos(mimeType: String, requiresSecureDecoder: Boolean, requiresTunnelingDecoder: Boolean): List<MediaCodecInfo> {
+            val real = MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+            val first = real.firstOrNull() ?: return real
+            val broken = MediaCodecInfo.newInstance(
+                "c2.test.broken.decoder", first.mimeType, first.codecMimeType, first.capabilities,
+                true, false, true, false, false,
+            )
+            return listOf(broken) + real
+        }
+    }
 
     suspend fun convert(
         context: Context,
@@ -195,6 +217,19 @@ object VideoConverter {
                         when {
                             asf != null -> setAssetLoaderFactory(AsfAssetLoader.Factory(context))
                             frameworkReader -> setAssetLoaderFactory(FrameworkAssetLoader.Factory(context))
+                            // Scheitert der erste Dekoder (oft Hardware), probiert Media3 die übrigen – bis zum
+                            // Software-Dekoder von Android. Ohne diese Einstellung bricht Media3 sofort ab.
+                            else -> setAssetLoaderFactory(
+                                DefaultAssetLoaderFactory(
+                                    context.applicationContext,
+                                    DefaultDecoderFactory.Builder(context.applicationContext)
+                                        .setEnableDecoderFallback(true)
+                                        .apply { if (brokenDecoderForTest) setMediaCodecSelector(BrokenFirstSelector) }
+                                        .build(),
+                                    Clock.DEFAULT,
+                                    null,
+                                )
+                            )
                         }
                     }
                     .apply {

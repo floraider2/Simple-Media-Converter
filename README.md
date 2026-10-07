@@ -37,10 +37,10 @@ Hardware = the phone's own media chip. Android software = codecs that ship with 
 
 | Input | Reading the file | Decoding | Fallback |
 |---|---|---|---|
-| Video: MP4, MKV, WebM, MOV, 3GP, AVI, TS | Media3 | Phone's decoder (usually hardware) | Android's own reader with the phone's decoders, if Media3 can't read the file |
+| Video: MP4, MKV, WebM, MOV, 3GP, AVI, TS | Media3 | Phone's decoder (usually hardware) | If a decoder fails: the phone's next decoder, down to Android's software decoder. If Media3 can't read the file: Android's own reader |
 | Video: **WMV, ASF** | Own (FFmpeg, ASF reader) | Own, software (FFmpeg: WMV1/2/3, VC-1; NEON-optimized on ARM) | – |
-| Audio: MP3, AAC/M4A, Opus, Vorbis, AMR … | Media3 | Android software (batched on Android 15+) | Android's own reader; normal decoder if batching fails |
-| Audio: FLAC | Own FLAC reader (checks every frame) | Android software | Media3 or Android's own reader |
+| Audio: MP3, AAC/M4A, Opus, Vorbis, AMR … | Media3 | Phone's decoder, usually Android software (batched on Android 15+) | If a decoder fails: the next one, down to Android's software decoder. Android's own reader |
+| Audio: FLAC | Own FLAC reader (checks every frame) | Android software | next decoder; Media3 or Android's own reader |
 | Audio: WAV (16-bit) | Own | – (already PCM) | – |
 | Audio: **WMA** (v1, v2, Pro, Voice, Lossless) | Own (FFmpeg) | Own, software (FFmpeg) | – |
 | Image: JPG, PNG, WebP, HEIC, AVIF | Android | Android (ImageDecoder) | BitmapFactory on Android 8 |
@@ -121,7 +121,7 @@ Translations are welcome: copy `app/src/main/res/values/strings.xml` to `values-
 - **v0.4** ✅ Trim with preview, loudness normalization (−14 LUFS), history with search, thumbnails, accessibility
 - **v0.5** ✅ Speed: “Keep original” without re-encoding, much faster audio, parallel image batches, smaller APK
 - **v0.6** ✅ Everything updated (Android 17 SDK, Media3, Compose, Kotlin, Gradle), faster app start (Baseline Profile), much faster M4A
-- **v0.7** ✅ WMV and WMA on every phone (FFmpeg, software), clearer messages for unreadable files
+- **v0.7** ✅ WMV and WMA on every phone (FFmpeg, software), clearer messages for unreadable files; 0.7.1: software fallback when a hardware decoder fails
 - **Maybe:** F-Droid and Play Store – not decided yet
 
 Details: [PLAN.md](PLAN.md) (German).

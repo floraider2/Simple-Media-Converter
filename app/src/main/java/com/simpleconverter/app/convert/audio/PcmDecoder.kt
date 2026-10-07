@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
 import com.simpleconverter.app.R
 import com.simpleconverter.app.convert.ConversionException
 import com.simpleconverter.app.convert.wmv.AsfDecoder
@@ -50,6 +51,10 @@ interface PcmSink {
 object PcmDecoder {
 
     private const val TAG = "PcmDecoder"
+
+    /** Nur für Tests: setzt einen nicht vorhandenen Dekoder an die Spitze, damit der Rückfall greifen muss. */
+    @VisibleForTesting
+    internal var brokenDecoderForTest = false
     private const val BATCH_INPUT_BYTES = 256 * 1024
     private const val BATCH_MAX_FRAMES = 64
 
@@ -192,21 +197,49 @@ object PcmDecoder {
      */
     private suspend fun withCodec(extractor: AudioSource, format: MediaFormat, sink: PcmSink, range: Range) {
         val mime = format.getString(MediaFormat.KEY_MIME)!!
-        val batchCodec = if (Build.VERSION.SDK_INT >= 35 && extractor.canBatch && mime in BATCH_DECODE_OK) batchingDecoder(mime) else null
-        if (batchCodec != null) {
-            val ok = runCatching { decodeWith(MediaCodec.createByCodecName(batchCodec), format, batching = true, extractor, sink, range) }
-            if (ok.isSuccess) return
-            val error = ok.exceptionOrNull()
-            // Abfangen nur, solange noch nichts beim Ziel angekommen ist – sonst wäre die Ausgabe doppelt.
-            val retry = error is SetupException || (error is StallException && !error.anyOutput)
-            if (!retry) throw error!!
-            Log.w(TAG, "Bündeln mit $batchCodec nicht möglich, normaler Weg", error)
-            extractor.seekTo(maxOf(range.startUs, 0L))
+        // Reihenfolge: gebündelter Dekoder (Android 15+), dann alle Dekoder für das Format, wie Android sie anbietet
+        // (meist Hardware vor Software). Scheitert einer, bevor etwas beim Ziel ankam, ist der nächste dran.
+        val candidates = buildList {
+            if (brokenDecoderForTest) add("c2.test.broken.decoder" to false)
+            if (Build.VERSION.SDK_INT >= 35 && extractor.canBatch && mime in BATCH_DECODE_OK) batchingDecoder(mime)?.let { add(it to true) }
+            decodersFor(mime).forEach { add(it to false) }
         }
-        decodeWith(MediaCodec.createDecoderByType(mime), format, batching = false, extractor, sink, range)
+        if (candidates.isEmpty()) throw ConversionException(R.string.err_cannot_read_format)
+        var lastError: Throwable? = null
+        for ((index, candidate) in candidates.withIndex()) {
+            val (name, batching) = candidate
+            if (index > 0) extractor.seekTo(maxOf(range.startUs, 0L))
+            val result = runCatching {
+                val codec = try {
+                    MediaCodec.createByCodecName(name)
+                } catch (e: Exception) {
+                    throw SetupException(e)
+                }
+                decodeWith(codec, format, batching, extractor, sink, range)
+            }
+            if (result.isSuccess) return
+            val error = result.exceptionOrNull()!!
+            // Nur wiederholen, solange noch nichts beim Ziel angekommen ist – sonst wäre die Ausgabe doppelt.
+            val retry = error is SetupException || error is NoOutputException || (error is StallException && !error.anyOutput)
+            if (!retry) throw error
+            Log.w(TAG, "Dekoder $name gescheitert, nächster", error)
+            lastError = error
+        }
+        // Alle Dekoder gescheitert: den ursprünglichen Fehler melden.
+        val cause = lastError
+        throw if (cause is NoOutputException || cause is SetupException) cause.cause ?: cause else cause!!
     }
 
+    /** Alle Dekoder des Geräts für [mime], in der Reihenfolge, die Android vorgibt. */
+    private fun decodersFor(mime: String): List<String> =
+        MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+            .filter { !it.isEncoder && it.supportedTypes.any { t -> t.equals(mime, ignoreCase = true) } }
+            .map { it.name }
+
     private class SetupException(cause: Throwable) : Exception(cause)
+
+    /** Der Dekoder ist gescheitert, bevor er etwas geliefert hat – ein anderer darf es versuchen. */
+    private class NoOutputException(cause: Throwable) : Exception(cause)
 
     /** Der Dekoder hat [STALL_MS] lang nichts gemeldet. */
     private class StallException(val anyOutput: Boolean) : Exception("Dekoder antwortet nicht")
@@ -296,6 +329,18 @@ object PcmDecoder {
         private var floatScratch: ByteBuffer? = null
 
         suspend fun run(events: LinkedBlockingQueue<Event>) {
+            try {
+                runLoop(events)
+            } catch (e: Exception) {
+                // Abbruch durch den Nutzer nie umdeuten; sonst: ohne Ausgabe darf ein anderer Dekoder ran.
+                if (e is kotlinx.coroutines.CancellationException || started || e is StallException) throw e
+                throw NoOutputException(e)
+            }
+            if (!started) throw ConversionException(R.string.err_empty_audio_track)
+            sink.finish()
+        }
+
+        private suspend fun runLoop(events: LinkedBlockingQueue<Event>) {
             var outputDone = false
             var lastEvent = System.currentTimeMillis()
             while (!outputDone) {
@@ -327,8 +372,6 @@ object PcmDecoder {
                     }
                 }
             }
-            if (!started) throw ConversionException(R.string.err_empty_audio_track)
-            sink.finish()
         }
 
         private fun feedOne(index: Int, buffer: ByteBuffer) {

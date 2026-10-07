@@ -14,8 +14,8 @@ android {
         applicationId = "com.simpleconverter.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 7
-        versionName = "0.7.0"
+        versionCode = 8
+        versionName = "0.7.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Leistungsmessungen (@LargeTest) laufen nur gezielt, nicht bei jedem Testlauf:
         // ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.simpleconverter.app.PerfTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.FlakyTest
