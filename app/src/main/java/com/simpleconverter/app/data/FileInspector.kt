@@ -7,6 +7,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import com.simpleconverter.app.convert.wmv.AsfDecoder
 import com.simpleconverter.app.model.InputFile
 import com.simpleconverter.app.model.MediaKind
 
@@ -42,6 +43,17 @@ object FileInspector {
 
         if (size < 0) {
             size = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } }.getOrNull() ?: 0L
+        }
+        // WMV/WMA: Android kennt das Format meist nicht, FFmpeg liefert die Eckdaten.
+        if (kind != MediaKind.IMAGE && AsfDecoder.isAsf(context, uri)) {
+            val info = runCatching { AsfDecoder.open(context, uri).use { it.info } }.getOrNull() ?: return null
+            return InputFile(
+                uri, displayName, size, mime, if (info.hasVideo) MediaKind.VIDEO else MediaKind.AUDIO,
+                durationMs = info.durationUs.takeIf { it > 0 }?.let { it / 1000 },
+                hasAudio = info.hasAudio,
+                videoMime = if (info.hasVideo) "video/x-ms-wmv" else null,
+                audioMime = if (info.hasAudio) "audio/x-ms-wma" else null,
+            )
         }
         val duration = if (kind == MediaKind.IMAGE) null else readDuration(context, uri)
         val tracks = if (kind == MediaKind.IMAGE) null else trackMimes(context, uri)

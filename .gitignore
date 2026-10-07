@@ -12,3 +12,4 @@
 *.apk
 *.aab
 .kotlin/
+.vscode/
